@@ -11,9 +11,11 @@ import {
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
+import { useUser } from "@/hooks/use-trading";
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: ChartLine, current: true },
+  { name: 'User Profile', href: '/user', icon: User, current: false },
   { name: 'Futures', href: '/futures', icon: Coins, current: false },
   { name: 'Options', href: '/options', icon: PieChart, current: false },
   { name: 'History', href: '/history', icon: History, current: false },
@@ -23,6 +25,7 @@ const navigation = [
 
 export function Sidebar() {
   const [location] = useLocation();
+  const { data: user } = useUser();
 
   return (
     <aside className="w-64 bg-white shadow-lg border-r border-gray-200 flex flex-col">
@@ -63,18 +66,17 @@ export function Sidebar() {
       </nav>
       
       <div className="p-6 border-t border-gray-200">
-        <div className="flex items-center space-x-3">
+        <Link href="/user" className="flex items-center space-x-3 hover:bg-gray-50 rounded-lg p-2 transition-colors">
           <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
             <User className="text-gray-600 h-4 w-4" />
           </div>
           <div className="flex-1">
-            <p className="text-sm font-medium text-gray-900">john.doe@email.com</p>
-            <p className="text-xs text-gray-500">Connected</p>
+            <p className="text-sm font-medium text-gray-900">{user?.username || 'User'}</p>
+            <p className="text-xs text-gray-500">
+              {user?.apiKey ? 'API Connected' : 'API Not Connected'}
+            </p>
           </div>
-          <button className="text-gray-400 hover:text-gray-600">
-            <LogOut className="h-4 w-4" />
-          </button>
-        </div>
+        </Link>
       </div>
     </aside>
   );
