@@ -38,6 +38,10 @@ export function SettingsContent() {
   const [isDeleting, setIsDeleting] = useState(false);
   const { user, logout } = useAuth();
   const { toast } = useToast();
+
+  // Debug: Show current user info
+  console.log('SettingsContent - Current user:', user);
+  console.log('SettingsContent - User ID:', user?.id);
   
   // Get user data for API credentials
   const { data: userData, isLoading: userLoading } = useUser();
@@ -139,12 +143,44 @@ export function SettingsContent() {
     }
   };
 
+  // Show user info for debugging
+  if (!user) {
+    return (
+      <div className="space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Authentication Required</CardTitle>
+            <CardDescription>
+              You need to be logged in to access settings. Please log out and log back in.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">Current user: {user ? JSON.stringify(user) : 'null'}</p>
+            <p className="text-sm text-muted-foreground">Try logging in as "jeezman" to test API credentials.</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold text-gray-900">Settings</h2>
         <p className="text-gray-600 mt-1">Manage your account settings and preferences.</p>
       </div>
+
+      {/* Debug Info */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Debug Info</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">Current User ID: {user.id}</p>
+          <p className="text-sm text-muted-foreground">Username: {user.username}</p>
+          <p className="text-sm text-muted-foreground">API Key exists: {user.apiKey ? 'Yes' : 'No'}</p>
+        </CardContent>
+      </Card>
 
       {/* Account Information */}
       <Card>

@@ -40,10 +40,11 @@ export function useAuthState() {
     // Check if user is stored in sessionStorage
     const storedUser = sessionStorage.getItem('auth_user');
     console.log('Auth useEffect: Stored user data:', storedUser);
-    if (storedUser) {
+    if (storedUser && storedUser !== '{}') {
       try {
         const parsedUser = JSON.parse(storedUser);
         console.log('Auth useEffect: Parsed user:', parsedUser);
+        console.log('Auth useEffect: User ID:', parsedUser.id);
         setUser(parsedUser);
       } catch (e) {
         console.log('Auth useEffect: Error parsing stored user, removing from storage');
@@ -59,6 +60,7 @@ export function useAuthState() {
     const response = await apiRequest('POST', '/api/login', { username, password });
     const user = await response.json();
     console.log('Login response parsed:', user);
+    console.log('Login response user ID:', user.id);
     setUser(user);
     sessionStorage.setItem('auth_user', JSON.stringify(user));
     console.log('User set in auth context and session storage');

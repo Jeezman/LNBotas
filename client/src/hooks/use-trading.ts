@@ -127,9 +127,15 @@ export function useCloseTrade() {
 export function useCloseAllTrades() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { user: authUser } = useAuth();
 
   return useMutation({
-    mutationFn: () => api.closeAllTrades(MOCK_USER_ID),
+    mutationFn: () => {
+      if (!authUser?.id) {
+        throw new Error('No user ID available for closing trades');
+      }
+      return api.closeAllTrades(Number(authUser.id));
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/trades'] });
       toast({
