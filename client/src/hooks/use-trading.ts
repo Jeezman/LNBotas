@@ -12,6 +12,16 @@ export function useMarketData() {
 
 export function useUser(userId?: string | number) {
   const { user: authUser } = useAuth();
+  
+  // If we have an authenticated user from context, return that instead of making API call
+  if (authUser && !userId) {
+    return {
+      data: authUser,
+      isLoading: false,
+      error: null
+    };
+  }
+  
   const userIdParam = userId || authUser?.id;
   
   return useQuery<User>({

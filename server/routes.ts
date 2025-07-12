@@ -115,7 +115,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       // Don't return sensitive data
-      const { password: _, apiSecret, ...safeUser } = user;
+      const { password: _, ...safeUser } = user;
       res.json(safeUser);
     } catch (error) {
       console.error('Error creating user:', error);
@@ -123,7 +123,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/user/login", async (req, res) => {
+  app.post("/api/login", async (req, res) => {
     try {
       const { username, password } = req.body;
       
@@ -134,6 +134,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Find user by username
       const user = await storage.getUserByUsername(username);
       if (!user) {
+
         return res.status(401).json({ message: "Invalid username or password" });
       }
 
@@ -144,7 +145,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Don't return sensitive data
-      const { password: _, apiSecret, ...safeUser } = user;
+      const { password: _, ...safeUser } = user;
       res.json(safeUser);
     } catch (error) {
       console.error('Error logging in user:', error);
