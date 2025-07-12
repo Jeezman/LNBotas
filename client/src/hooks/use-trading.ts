@@ -167,7 +167,7 @@ export function useUpdateMarketData() {
 export function useUpdateUserCredentials(userId?: string | number) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const { user: authUser } = useAuth();
+  const { user: authUser, setUser } = useAuth();
   const userIdParam = userId || authUser?.id;
 
   return useMutation({
@@ -179,8 +179,23 @@ export function useUpdateUserCredentials(userId?: string | number) {
       }
       return api.updateUserCredentials(Number(userIdParam), credentials);
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      // Invalidate all user-related queries
       queryClient.invalidateQueries({ queryKey: ['/api/user'] });
+      
+      // Update the auth context with fresh user data that includes API credentials
+      if (authUser && data) {
+        const updatedUser = {
+          ...authUser,
+          apiKey: data.apiKey || authUser.apiKey,
+          apiSecret: data.apiSecret || authUser.apiSecret,
+          apiPassphrase: data.apiPassphrase || authUser.apiPassphrase,
+          balance: data.balance || authUser.balance,
+          balanceUSD: data.balanceUSD || authUser.balanceUSD,
+        };
+        setUser(updatedUser);
+      }
+      
       toast({
         title: "Credentials Updated",
         description: "Your API credentials have been updated successfully.",
