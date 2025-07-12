@@ -165,8 +165,14 @@ export function useUpdateUserCredentials(userId?: string | number) {
   const userIdParam = userId || authUser?.id;
 
   return useMutation({
-    mutationFn: (credentials: { apiKey: string; apiSecret: string; apiPassphrase: string }) =>
-      api.updateUserCredentials(Number(userIdParam), credentials),
+    mutationFn: (credentials: { apiKey: string; apiSecret: string; apiPassphrase: string }) => {
+      console.log('Update credentials mutation - User ID param:', userIdParam);
+      console.log('Update credentials mutation - Auth user:', authUser);
+      if (!userIdParam) {
+        throw new Error('No user ID available for updating credentials');
+      }
+      return api.updateUserCredentials(Number(userIdParam), credentials);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/user'] });
       toast({

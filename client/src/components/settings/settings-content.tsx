@@ -64,6 +64,9 @@ export function SettingsContent() {
   }, [userData, form]);
 
   const onSubmit = (values: CredentialsFormValues) => {
+    console.log('Settings form submit - Auth user:', user);
+    console.log('Settings form submit - User ID:', user?.id);
+    console.log('Settings form submit - Values:', values);
     updateCredentials.mutate(values, {
       onSuccess: () => {
         toast({
