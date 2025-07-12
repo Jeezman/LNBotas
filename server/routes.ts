@@ -256,8 +256,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
 
         res.json({ message: "API credentials updated successfully" });
-      } catch (apiError) {
-        res.status(400).json({ message: "Invalid API credentials" });
+      } catch (apiError: any) {
+        console.error('LN Markets API validation failed:', apiError);
+        console.error('API Key being tested:', apiKey);
+        console.error('API Secret length:', apiSecret?.length);
+        console.error('API Passphrase:', apiPassphrase);
+        res.status(400).json({ message: "Invalid API credentials", detail: apiError.message || 'API connection failed' });
       }
     } catch (error) {
       console.error('Error updating credentials:', error);
