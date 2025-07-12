@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import { insertTradeSchema } from "@shared/schema";
 import { createLNMarketsService } from "./services/lnmarkets";
 import { z } from "zod";
+import bcrypt from "bcrypt";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Market data endpoints
@@ -91,15 +92,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Username and password are required" });
       }
 
+      if (password.length < 6) {
+        return res.status(400).json({ message: "Password must be at least 6 characters long" });
+      }
+
       // Check if user already exists
       const existingUser = await storage.getUserByUsername(username);
       if (existingUser) {
         return res.status(400).json({ message: "User already exists" });
       }
 
+      // Hash the password before storing
+      const saltRounds = 12;
+      const hashedPassword = await bcrypt.hash(password, saltRounds);
+
       const user = await storage.createUser({
         username,
-        password, // In production, this should be hashed
+        password: hashedPassword,
         apiKey: null,
         apiSecret: null,
         apiPassphrase: null,
@@ -111,6 +120,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error creating user:', error);
       res.status(500).json({ message: "Failed to create user" });
+    }
+  });
+
+  app.post("/api/user/login", async (req, res) => {
+    try {
+      const { username, password } = req.body;
+      
+      if (!username || !password) {
+        return res.status(400).json({ message: "Username and password are required" });
+      }
+
+      // Find user by username
+      const user = await storage.getUserByUsername(username);
+      if (!user) {
+        return res.status(401).json({ message: "Invalid username or password" });
+      }
+
+      // Verify password
+      const isValidPassword = await bcrypt.compare(password, user.password);
+      if (!isValidPassword) {
+        return res.status(401).json({ message: "Invalid username or password" });
+      }
+
+      // Don't return sensitive data
+      const { password: _, apiSecret, ...safeUser } = user;
+      res.json(safeUser);
+    } catch (error) {
+      console.error('Error logging in user:', error);
+      res.status(500).json({ message: "Failed to log in" });
     }
   });
 

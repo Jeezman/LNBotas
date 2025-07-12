@@ -12,6 +12,8 @@ Preferred communication style: Simple, everyday language.
 
 - **Demo Mode Removal**: Completely removed all demo mode functionality and sample data per user request with real LN Markets API credentials
 - **User Registration System**: Added user registration system with dedicated registration page and backend user creation endpoint
+- **Secure Authentication**: Implemented bcrypt password hashing with 12 salt rounds for secure user authentication
+- **Login System**: Created comprehensive login/logout system with password verification and user session management
 - **Dynamic User Management**: Updated all hooks and components to support dynamic user IDs instead of hard-coded demo user
 - **Database Cleanup**: Removed demo user and sample market data from database initialization
 - **Real API Integration**: Application now operates exclusively with authentic LN Markets API credentials

@@ -5,14 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, User } from "lucide-react";
+import { AlertCircle, LogIn } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 
-export default function RegisterPage() {
+export default function LoginPage() {
   const [, setLocation] = useLocation();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
@@ -20,31 +19,21 @@ export default function RegisterPage() {
     e.preventDefault();
     setError("");
 
-    if (!username || !password || !confirmPassword) {
-      setError("All fields are required");
-      return;
-    }
-
-    if (password !== confirmPassword) {
-      setError("Passwords do not match");
-      return;
-    }
-
-    if (password.length < 6) {
-      setError("Password must be at least 6 characters long");
+    if (!username || !password) {
+      setError("Please enter both username and password");
       return;
     }
 
     setIsLoading(true);
 
     try {
-      const response = await apiRequest("POST", "/api/user/register", { username, password });
+      const response = await apiRequest("POST", "/api/user/login", { username, password });
       const user = await response.json();
 
-      // Registration successful, redirect to dashboard with user ID
+      // Login successful, redirect to dashboard with user ID
       setLocation(`/dashboard?userId=${user.id}`);
     } catch (error: any) {
-      setError(error.message || "Registration failed. Please try again.");
+      setError(error.message || "Login failed. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -56,12 +45,12 @@ export default function RegisterPage() {
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
             <div className="h-12 w-12 bg-primary/10 rounded-full flex items-center justify-center">
-              <User className="h-6 w-6 text-primary" />
+              <LogIn className="h-6 w-6 text-primary" />
             </div>
           </div>
-          <CardTitle className="text-2xl">Create Account</CardTitle>
+          <CardTitle className="text-2xl">Sign In</CardTitle>
           <CardDescription>
-            Create a new account to start trading Bitcoin derivatives with LN Markets
+            Sign in to your account to access Bitcoin derivatives trading
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -97,35 +86,23 @@ export default function RegisterPage() {
               />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="confirmPassword">Confirm Password</Label>
-              <Input
-                id="confirmPassword"
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="Confirm your password"
-                required
-              />
-            </div>
-
             <Button 
               type="submit" 
               className="w-full" 
               disabled={isLoading}
             >
-              {isLoading ? "Creating Account..." : "Create Account"}
+              {isLoading ? "Signing In..." : "Sign In"}
             </Button>
           </form>
 
           <div className="mt-6 text-center">
             <p className="text-sm text-gray-600 dark:text-gray-400">
-              Already have an account?{" "}
+              Don't have an account?{" "}
               <button
-                onClick={() => setLocation("/")}
+                onClick={() => setLocation("/register")}
                 className="text-primary hover:underline"
               >
-                Sign in here
+                Create one here
               </button>
             </p>
           </div>
