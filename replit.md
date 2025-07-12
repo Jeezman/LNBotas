@@ -22,10 +22,11 @@ Preferred communication style: Simple, everyday language.
 ### Backend Architecture
 - **Runtime**: Node.js with Express.js
 - **Language**: TypeScript with ES modules
-- **Database**: PostgreSQL with Drizzle ORM
-- **Database Provider**: Neon Database (serverless PostgreSQL)
+- **Database**: PostgreSQL with Drizzle ORM (Database implementation active)
+- **Database Provider**: PostgreSQL with connection pooling
 - **API Pattern**: RESTful API with Express routes
-- **Session Management**: PostgreSQL-backed sessions using connect-pg-simple
+- **LN Markets Integration**: Official @ln-markets/api package
+- **Session Management**: In-memory sessions for development
 
 ### Key Components
 

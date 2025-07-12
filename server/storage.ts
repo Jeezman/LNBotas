@@ -1,4 +1,6 @@
 import { users, trades, marketData, type User, type InsertUser, type Trade, type InsertTrade, type MarketData, type InsertMarketData } from "@shared/schema";
+import { db } from "./db";
+import { eq, and } from "drizzle-orm";
 
 export interface IStorage {
   // User operations
@@ -202,4 +204,91 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+export class DatabaseStorage implements IStorage {
+  async getUser(id: number): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user || undefined;
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user || undefined;
+  }
+
+  async createUser(insertUser: InsertUser): Promise<User> {
+    const [user] = await db
+      .insert(users)
+      .values(insertUser)
+      .returning();
+    return user;
+  }
+
+  async updateUser(id: number, updates: Partial<User>): Promise<User | undefined> {
+    const [user] = await db
+      .update(users)
+      .set(updates)
+      .where(eq(users.id, id))
+      .returning();
+    return user || undefined;
+  }
+
+  async getTrade(id: number): Promise<Trade | undefined> {
+    const [trade] = await db.select().from(trades).where(eq(trades.id, id));
+    return trade || undefined;
+  }
+
+  async getTradesByUserId(userId: number): Promise<Trade[]> {
+    return db.select().from(trades).where(eq(trades.userId, userId));
+  }
+
+  async getActiveTradesByUserId(userId: number): Promise<Trade[]> {
+    return db.select().from(trades).where(and(eq(trades.userId, userId), eq(trades.status, 'open')));
+  }
+
+  async createTrade(insertTrade: InsertTrade): Promise<Trade> {
+    const [trade] = await db
+      .insert(trades)
+      .values({
+        ...insertTrade,
+        status: 'pending',
+      })
+      .returning();
+    return trade;
+  }
+
+  async updateTrade(id: number, updates: Partial<Trade>): Promise<Trade | undefined> {
+    const [trade] = await db
+      .update(trades)
+      .set(updates)
+      .where(eq(trades.id, id))
+      .returning();
+    return trade || undefined;
+  }
+
+  async deleteTrade(id: number): Promise<boolean> {
+    const result = await db.delete(trades).where(eq(trades.id, id));
+    return (result.rowCount || 0) > 0;
+  }
+
+  async getMarketData(symbol: string): Promise<MarketData | undefined> {
+    const [data] = await db.select().from(marketData).where(eq(marketData.symbol, symbol));
+    return data || undefined;
+  }
+
+  async updateMarketData(data: InsertMarketData): Promise<MarketData> {
+    const [marketDataResult] = await db
+      .insert(marketData)
+      .values(data)
+      .onConflictDoUpdate({
+        target: marketData.symbol,
+        set: {
+          ...data,
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
+    return marketDataResult;
+  }
+}
+
+export const storage = new DatabaseStorage();
