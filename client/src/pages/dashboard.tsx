@@ -9,10 +9,47 @@ import { useUser, useUpdateMarketData } from "@/hooks/use-trading";
 import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
+import { useLocation } from "wouter";
+import UserPage from "./user";
+
+function DashboardContent() {
+  return (
+    <>
+      <MarketOverview />
+      
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mt-6">
+        {/* Trading Panel */}
+        <div className="xl:col-span-2 space-y-6">
+          <PriceChart />
+          <ActivePositions />
+        </div>
+        
+        {/* Trading Form */}
+        <div className="space-y-6">
+          <TradingForm />
+          <MarketInfo />
+          <QuickActions />
+        </div>
+      </div>
+    </>
+  );
+}
+
+function PlaceholderPage({ title }: { title: string }) {
+  return (
+    <div className="flex items-center justify-center h-64">
+      <div className="text-center">
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">{title}</h2>
+        <p className="text-gray-600">This page is coming soon...</p>
+      </div>
+    </div>
+  );
+}
 
 export default function Dashboard() {
   const { data: user } = useUser();
   const updateMarketData = useUpdateMarketData();
+  const [location] = useLocation();
 
   // Update market data on component mount and periodically
   useEffect(() => {
@@ -24,6 +61,37 @@ export default function Dashboard() {
     return () => clearInterval(interval);
   }, []);
 
+  const getPageTitle = () => {
+    switch (location) {
+      case '/user': return 'User Profile';
+      case '/futures': return 'Futures Trading';
+      case '/options': return 'Options Trading';
+      case '/history': return 'Trade History';
+      case '/portfolio': return 'Portfolio';
+      case '/settings': return 'Settings';
+      default: return 'Trading Dashboard';
+    }
+  };
+
+  const renderPageContent = () => {
+    switch (location) {
+      case '/user':
+        return <UserPage />;
+      case '/futures':
+        return <PlaceholderPage title="Futures Trading" />;
+      case '/options':
+        return <PlaceholderPage title="Options Trading" />;
+      case '/history':
+        return <PlaceholderPage title="Trade History" />;
+      case '/portfolio':
+        return <PlaceholderPage title="Portfolio" />;
+      case '/settings':
+        return <PlaceholderPage title="Settings" />;
+      default:
+        return <DashboardContent />;
+    }
+  };
+
   return (
     <div className="min-h-screen flex bg-gray-50">
       <Sidebar />
@@ -33,11 +101,13 @@ export default function Dashboard() {
         <header className="bg-white border-b border-gray-200 px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
-              <h2 className="text-2xl font-bold text-gray-900">Trading Dashboard</h2>
-              <div className="flex items-center space-x-2">
-                <div className="w-2 h-2 bg-success rounded-full"></div>
-                <span className="text-sm text-gray-600">Market Open</span>
-              </div>
+              <h2 className="text-2xl font-bold text-gray-900">{getPageTitle()}</h2>
+              {location === '/' && (
+                <div className="flex items-center space-x-2">
+                  <div className="w-2 h-2 bg-success rounded-full"></div>
+                  <span className="text-sm text-gray-600">Market Open</span>
+                </div>
+              )}
             </div>
             
             <div className="flex items-center space-x-4">
@@ -57,32 +127,19 @@ export default function Dashboard() {
                 </div>
               </div>
               
-              <Button className="bg-primary text-white hover:bg-blue-800">
-                <Plus className="w-4 h-4 mr-2" />
-                Deposit
-              </Button>
+              {location === '/' && (
+                <Button className="bg-primary text-white hover:bg-blue-800">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Deposit
+                </Button>
+              )}
             </div>
           </div>
         </header>
 
-        {/* Dashboard Content */}
+        {/* Page Content */}
         <div className="flex-1 overflow-y-auto p-6">
-          <MarketOverview />
-          
-          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mt-6">
-            {/* Trading Panel */}
-            <div className="xl:col-span-2 space-y-6">
-              <PriceChart />
-              <ActivePositions />
-            </div>
-            
-            {/* Trading Form */}
-            <div className="space-y-6">
-              <TradingForm />
-              <MarketInfo />
-              <QuickActions />
-            </div>
-          </div>
+          {renderPageContent()}
         </div>
       </main>
     </div>
