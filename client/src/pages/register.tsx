@@ -38,10 +38,8 @@ export default function RegisterPage() {
     setIsLoading(true);
 
     try {
-      const user = await apiRequest("/api/user/register", {
-        method: "POST",
-        body: JSON.stringify({ username, password }),
-      });
+      const response = await apiRequest("POST", "/api/user/register", { username, password });
+      const user = await response.json();
 
       // Registration successful, redirect to dashboard with user ID
       setLocation(`/dashboard?userId=${user.id}`);
