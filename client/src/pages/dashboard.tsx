@@ -5,6 +5,7 @@ import { ActivePositions } from "@/components/trading/active-positions";
 import { TradingForm } from "@/components/trading/trading-form";
 import { MarketInfo } from "@/components/trading/market-info";
 import { QuickActions } from "@/components/trading/quick-actions";
+import { SettingsContent } from "@/components/settings/settings-content";
 import { useUser, useUpdateMarketData } from "@/hooks/use-trading";
 import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
@@ -86,7 +87,7 @@ export default function Dashboard() {
       case '/portfolio':
         return <PlaceholderPage title="Portfolio" />;
       case '/settings':
-        return <PlaceholderPage title="Settings" />;
+        return <SettingsContent />;
       default:
         return <DashboardContent />;
     }

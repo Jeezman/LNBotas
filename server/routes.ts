@@ -152,6 +152,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.delete("/api/user/:id", async (req, res) => {
+    try {
+      const userId = parseInt(req.params.id);
+      
+      if (!userId) {
+        return res.status(400).json({ message: "User ID is required" });
+      }
+
+      // Check if user exists
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Delete all user's trades first (foreign key constraint)
+      const userTrades = await storage.getTradesByUserId(userId);
+      for (const trade of userTrades) {
+        await storage.deleteTrade(trade.id);
+      }
+
+      // Delete the user account
+      const success = await storage.deleteUser(userId);
+      if (!success) {
+        return res.status(500).json({ message: "Failed to delete user account" });
+      }
+
+      res.json({ message: "Account deleted successfully" });
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      res.status(500).json({ message: "Failed to delete account" });
+    }
+  });
+
   app.get("/api/user/:id", async (req, res) => {
     try {
       const userId = parseInt(req.params.id);
