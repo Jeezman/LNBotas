@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthContext, useAuthState } from "@/hooks/use-auth";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
+import { PublicRoute } from "@/components/auth/PublicRoute";
 import NotFound from "@/pages/not-found";
 import Dashboard from "@/pages/dashboard";
 import UserPage from "@/pages/user";
@@ -14,9 +15,21 @@ import LoginPage from "@/pages/login";
 function Router() {
   return (
     <Switch>
-      <Route path="/" component={LoginPage} />
-      <Route path="/login" component={LoginPage} />
-      <Route path="/register" component={RegisterPage} />
+      <Route path="/">
+        <PublicRoute>
+          <LoginPage />
+        </PublicRoute>
+      </Route>
+      <Route path="/login">
+        <PublicRoute>
+          <LoginPage />
+        </PublicRoute>
+      </Route>
+      <Route path="/register">
+        <PublicRoute>
+          <RegisterPage />
+        </PublicRoute>
+      </Route>
       <Route path="/dashboard">
         <ProtectedRoute>
           <Dashboard />
