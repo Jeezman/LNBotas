@@ -9,7 +9,7 @@ import { useForm } from "react-hook-form";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useUpdateUserCredentials } from "@/hooks/use-trading";
 import { useToast } from "@/hooks/use-toast";
-import { User, Key, Bitcoin, DollarSign } from "lucide-react";
+import { User, Key, Bitcoin, DollarSign, AlertCircle } from "lucide-react";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 
@@ -223,14 +223,41 @@ export default function UserPage() {
             To enable live trading, you need to provide your LN Markets API credentials. 
             You can obtain these from your LN Markets account dashboard.
           </p>
-          <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
-            <h4 className="font-medium text-yellow-800 dark:text-yellow-200 mb-2">
-              Security Note
-            </h4>
-            <p className="text-sm text-yellow-700 dark:text-yellow-300">
-              Your API credentials are encrypted and stored securely. Never share your 
-              API credentials with anyone else.
-            </p>
+          <div className="space-y-4">
+            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+              <h4 className="font-medium text-blue-800 dark:text-blue-200 mb-2">
+                How to Get API Credentials
+              </h4>
+              <ol className="text-sm text-blue-700 dark:text-blue-300 space-y-1 list-decimal list-inside">
+                <li>Log in to your LN Markets account</li>
+                <li>Go to Account → API Management</li>
+                <li>Create a new API key with trading permissions</li>
+                <li>Copy the API Key, Secret, and Passphrase</li>
+                <li>Enter them in the form above</li>
+              </ol>
+            </div>
+            
+            <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+              <h4 className="font-medium text-yellow-800 dark:text-yellow-200 mb-2">
+                Security Note
+              </h4>
+              <p className="text-sm text-yellow-700 dark:text-yellow-300">
+                Your API credentials are encrypted and stored securely. Never share your 
+                API credentials with anyone else. The app will test your credentials when you save them.
+              </p>
+            </div>
+            
+            <div className="bg-gray-50 dark:bg-gray-900/20 border border-gray-200 dark:border-gray-800 rounded-lg p-4">
+              <h4 className="font-medium text-gray-800 dark:text-gray-200 mb-2 flex items-center gap-2">
+                <AlertCircle className="h-4 w-4" />
+                Demo Mode
+              </h4>
+              <p className="text-sm text-gray-700 dark:text-gray-300">
+                The app currently runs in demo mode with sample data. To enable live trading with real Bitcoin, 
+                add your LN Markets API credentials above. Without valid credentials, you can still explore 
+                the interface and test trading features with simulated data.
+              </p>
+            </div>
           </div>
         </CardContent>
       </Card>

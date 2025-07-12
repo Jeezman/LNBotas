@@ -8,6 +8,12 @@ This is a modern web application for Bitcoin derivatives trading through the LN 
 
 Preferred communication style: Simple, everyday language.
 
+## Recent Changes (December 2024)
+
+- **Navigation Structure**: Restructured application to maintain sidebar across all pages, making dashboard a layout wrapper that shows different content based on route
+- **User Profile Integration**: Added comprehensive user profile page as subpage within dashboard layout, including API credentials management
+- **Layout System**: All navigation items (Dashboard, User Profile, Futures, Options, History, Portfolio, Settings) now operate as subpages maintaining consistent sidebar navigation
+
 ## System Architecture
 
 ### Frontend Architecture
