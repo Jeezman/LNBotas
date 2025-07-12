@@ -29,10 +29,14 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      await login(username, password);
+      console.log('Login page: Attempting login with:', { username });
+      const user = await login(username, password);
+      console.log('Login page: Login successful, user:', user);
       // Login successful, redirect to dashboard
+      console.log('Login page: Navigating to dashboard');
       setLocation("/dashboard");
     } catch (error: any) {
+      console.error('Login page: Login failed:', error);
       setError(error.message || "Login failed. Please try again.");
     } finally {
       setIsLoading(false);
