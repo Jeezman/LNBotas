@@ -55,11 +55,11 @@ export class LNMarketsService {
 
   // User operations
   async getUserInfo(): Promise<UserInfo> {
-    return this.client.getUser();
+    return this.client.userGet();
   }
 
   async getBalance(): Promise<{ balance: string }> {
-    const userInfo = await this.client.getUser();
+    const userInfo = await this.client.userGet();
     return { balance: userInfo.balance };
   }
 
