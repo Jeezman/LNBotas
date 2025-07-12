@@ -120,18 +120,19 @@ export function SettingsContent() {
               <AlertDialogHeader>
                 <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  <div className="space-y-2">
-                    <p>This action cannot be undone. This will permanently delete your account and remove all your data from our servers.</p>
-                    <p>This includes:</p>
-                    <ul className="list-disc list-inside text-sm space-y-1">
-                      <li>Your trading history and positions</li>
-                      <li>API credentials and connections</li>
-                      <li>Account settings and preferences</li>
-                      <li>All personal data associated with your account</li>
-                    </ul>
-                  </div>
+                  This action cannot be undone. This will permanently delete your account and remove all your data from our servers.
                 </AlertDialogDescription>
               </AlertDialogHeader>
+              
+              <div className="space-y-2 py-4">
+                <p className="text-sm text-gray-600">This includes:</p>
+                <ul className="list-disc list-inside text-sm space-y-1 text-gray-600">
+                  <li>Your trading history and positions</li>
+                  <li>API credentials and connections</li>
+                  <li>Account settings and preferences</li>
+                  <li>All personal data associated with your account</li>
+                </ul>
+              </div>
               
               <div className="space-y-4">
                 <div>
