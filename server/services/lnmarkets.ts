@@ -1,10 +1,10 @@
-import { createHmac } from 'crypto';
+import { createRestClient } from '@ln-markets/api';
 
 export interface LNMarketsConfig {
   apiKey: string;
   secret: string;
   passphrase: string;
-  baseUrl?: string;
+  network?: 'mainnet' | 'testnet';
 }
 
 export interface FuturesTradeRequest {
@@ -42,139 +42,92 @@ export interface UserInfo {
 }
 
 export class LNMarketsService {
-  private config: LNMarketsConfig;
+  private client: any;
 
   constructor(config: LNMarketsConfig) {
-    this.config = {
-      ...config,
-      baseUrl: config.baseUrl || 'https://api.lnmarkets.com/v2',
-    };
-  }
-
-  private createSignature(timestamp: string, method: string, path: string, params: string = ''): string {
-    const message = `${timestamp}${method}${path}${params}`;
-    return createHmac('sha256', this.config.secret)
-      .update(message)
-      .digest('base64');
-  }
-
-  private async makeRequest(method: string, endpoint: string, data?: any): Promise<any> {
-    const timestamp = Date.now().toString();
-    const path = `/v2${endpoint}`;
-    const params = data ? JSON.stringify(data) : '';
-    
-    const signature = this.createSignature(timestamp, method, path, params);
-    
-    const headers: Record<string, string> = {
-      'LNM-ACCESS-KEY': this.config.apiKey,
-      'LNM-ACCESS-SIGNATURE': signature,
-      'LNM-ACCESS-TIMESTAMP': timestamp,
-      'LNM-ACCESS-PASSPHRASE': this.config.passphrase,
-      'Content-Type': 'application/json',
-    };
-
-    const url = `${this.config.baseUrl}${endpoint}`;
-    
-    const response = await fetch(url, {
-      method,
-      headers,
-      body: data ? JSON.stringify(data) : undefined,
+    this.client = createRestClient({
+      key: config.apiKey,
+      secret: config.secret,
+      passphrase: config.passphrase,
+      network: config.network || 'mainnet',
     });
-
-    if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`LN Markets API error: ${response.status} ${error}`);
-    }
-
-    return response.json();
   }
 
   // User operations
   async getUserInfo(): Promise<UserInfo> {
-    return this.makeRequest('GET', '/user');
+    return this.client.getUser();
   }
 
   async getBalance(): Promise<{ balance: string }> {
-    return this.makeRequest('GET', '/user/balance');
+    const userInfo = await this.client.getUser();
+    return { balance: userInfo.balance };
   }
 
   // Futures operations
   async createFuturesTrade(trade: FuturesTradeRequest): Promise<any> {
-    return this.makeRequest('POST', '/futures', trade);
+    return this.client.futuresNewTrade(trade);
   }
 
   async getFuturesTrades(type: 'open' | 'closed' | 'pending' = 'open'): Promise<any[]> {
-    return this.makeRequest('GET', `/futures?type=${type}`);
+    return this.client.futuresGetTrades({ type });
   }
 
   async updateFuturesTrade(id: string, updates: { takeprofit?: number; stoploss?: number }): Promise<any> {
-    return this.makeRequest('PUT', `/futures?id=${id}`, updates);
+    return this.client.futuresUpdateTrade({ id, ...updates });
   }
 
   async closeFuturesTrade(id: string): Promise<any> {
-    return this.makeRequest('DELETE', `/futures?id=${id}`);
+    return this.client.futuresCloseTrade({ id });
   }
 
   async closeAllFuturesTrades(): Promise<any> {
-    return this.makeRequest('DELETE', '/futures/close-all');
+    return this.client.futuresCloseAllTrades();
   }
 
   async cancelAllFuturesOrders(): Promise<any> {
-    return this.makeRequest('DELETE', '/futures/cancel-all');
+    return this.client.futuresCancelAllTrades();
   }
 
   // Options operations
   async createOptionsTrade(trade: OptionsTradeRequest): Promise<any> {
-    return this.makeRequest('POST', '/options', trade);
+    return this.client.optionsNewTrade(trade);
   }
 
   async getOptionsTrades(): Promise<any[]> {
-    return this.makeRequest('GET', '/options');
+    return this.client.optionsGetTrades();
   }
 
   async closeOptionsTrade(id: string): Promise<any> {
-    return this.makeRequest('DELETE', `/options?id=${id}`);
+    return this.client.optionsCloseTrade({ id });
   }
 
   async getOptionsInstruments(): Promise<any[]> {
-    return this.makeRequest('GET', '/options/instruments');
+    return this.client.optionsGetInstruments();
   }
 
   // Market data operations
   async getFuturesTicker(): Promise<MarketTicker> {
-    return this.makeRequest('GET', '/futures/ticker');
+    return this.client.futuresGetTicker();
   }
 
   async getFuturesMarket(): Promise<any> {
-    return this.makeRequest('GET', '/futures/market');
+    return this.client.futuresGetMarket();
   }
 
   async getPriceHistory(from?: number, to?: number): Promise<any[]> {
-    let endpoint = '/futures/history/price';
-    const params = new URLSearchParams();
-    if (from) params.append('from', from.toString());
-    if (to) params.append('to', to.toString());
-    if (params.toString()) endpoint += `?${params.toString()}`;
-    
-    return this.makeRequest('GET', endpoint);
+    return this.client.futuresGetPriceHistory({ from, to });
   }
 
   async getIndexHistory(from?: number, to?: number): Promise<any[]> {
-    let endpoint = '/futures/history/index';
-    const params = new URLSearchParams();
-    if (from) params.append('from', from.toString());
-    if (to) params.append('to', to.toString());
-    if (params.toString()) endpoint += `?${params.toString()}`;
-    
-    return this.makeRequest('GET', endpoint);
+    return this.client.futuresGetIndexHistory({ from, to });
   }
 
   async getCarryFees(): Promise<any[]> {
-    return this.makeRequest('GET', '/futures/carry-fees');
+    return this.client.futuresGetCarryFees();
   }
 
   async getVolatility(): Promise<any> {
-    return this.makeRequest('GET', '/options/volatility');
+    return this.client.optionsGetVolatility();
   }
 }
 

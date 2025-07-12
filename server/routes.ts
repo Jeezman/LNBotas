@@ -196,7 +196,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             leverage: parseFloat(validatedData.leverage!),
             takeprofit: validatedData.takeProfit ? parseFloat(validatedData.takeProfit) : undefined,
             stoploss: validatedData.stopLoss ? parseFloat(validatedData.stopLoss) : undefined,
-            price: validatedData.orderType === 'limit' && validatedData.entryPrice ? parseFloat(validatedData.entryPrice) : undefined,
+            price: validatedData.orderType === 'limit' ? undefined : undefined, // Price would be set from client if needed
           };
 
           const lnTrade = await lnMarkets.createFuturesTrade(lnTradeRequest);
