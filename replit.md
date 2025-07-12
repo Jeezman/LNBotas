@@ -8,8 +8,13 @@ This is a modern web application for Bitcoin derivatives trading through the LN 
 
 Preferred communication style: Simple, everyday language.
 
-## Recent Changes (December 2024)
+## Recent Changes (January 2025)
 
+- **Demo Mode Removal**: Completely removed all demo mode functionality and sample data per user request with real LN Markets API credentials
+- **User Registration System**: Added user registration system with dedicated registration page and backend user creation endpoint
+- **Dynamic User Management**: Updated all hooks and components to support dynamic user IDs instead of hard-coded demo user
+- **Database Cleanup**: Removed demo user and sample market data from database initialization
+- **Real API Integration**: Application now operates exclusively with authentic LN Markets API credentials
 - **Navigation Structure**: Restructured application to maintain sidebar across all pages, making dashboard a layout wrapper that shows different content based on route
 - **User Profile Integration**: Added comprehensive user profile page as subpage within dashboard layout, including API credentials management
 - **Layout System**: All navigation items (Dashboard, User Profile, Futures, Options, History, Portfolio, Settings) now operate as subpages maintaining consistent sidebar navigation

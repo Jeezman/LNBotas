@@ -83,6 +83,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // User endpoints
+  app.post("/api/user/register", async (req, res) => {
+    try {
+      const { username, password } = req.body;
+      
+      if (!username || !password) {
+        return res.status(400).json({ message: "Username and password are required" });
+      }
+
+      // Check if user already exists
+      const existingUser = await storage.getUserByUsername(username);
+      if (existingUser) {
+        return res.status(400).json({ message: "User already exists" });
+      }
+
+      const user = await storage.createUser({
+        username,
+        password, // In production, this should be hashed
+        apiKey: null,
+        apiSecret: null,
+        apiPassphrase: null,
+      });
+
+      // Don't return sensitive data
+      const { password: _, apiSecret, ...safeUser } = user;
+      res.json(safeUser);
+    } catch (error) {
+      console.error('Error creating user:', error);
+      res.status(500).json({ message: "Failed to create user" });
+    }
+  });
+
   app.get("/api/user/:id", async (req, res) => {
     try {
       const userId = parseInt(req.params.id);

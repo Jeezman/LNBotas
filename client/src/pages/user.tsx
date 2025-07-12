@@ -247,17 +247,7 @@ export default function UserPage() {
               </p>
             </div>
             
-            <div className="bg-gray-50 dark:bg-gray-900/20 border border-gray-200 dark:border-gray-800 rounded-lg p-4">
-              <h4 className="font-medium text-gray-800 dark:text-gray-200 mb-2 flex items-center gap-2">
-                <AlertCircle className="h-4 w-4" />
-                Demo Mode
-              </h4>
-              <p className="text-sm text-gray-700 dark:text-gray-300">
-                The app currently runs in demo mode with sample data. To enable live trading with real Bitcoin, 
-                add your LN Markets API credentials above. Without valid credentials, you can still explore 
-                the interface and test trading features with simulated data.
-              </p>
-            </div>
+
           </div>
         </CardContent>
       </Card>

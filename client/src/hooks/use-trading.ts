@@ -11,32 +11,39 @@ export function useMarketData() {
   });
 }
 
-export function useUser() {
+export function useUser(userId?: string | number) {
+  const userIdParam = userId || new URLSearchParams(window.location.search).get('userId') || MOCK_USER_ID;
+  
   return useQuery<User>({
-    queryKey: ['/api/user', MOCK_USER_ID],
+    queryKey: ['/api/user', userIdParam],
   });
 }
 
-export function useActiveTrades() {
+export function useActiveTrades(userId?: string | number) {
+  const userIdParam = userId || new URLSearchParams(window.location.search).get('userId') || MOCK_USER_ID;
+  
   return useQuery<Trade[]>({
-    queryKey: ['/api/trades', MOCK_USER_ID, 'active'],
+    queryKey: ['/api/trades', userIdParam, 'active'],
     refetchInterval: 10000, // Refetch every 10 seconds
   });
 }
 
-export function useTradeHistory() {
+export function useTradeHistory(userId?: string | number) {
+  const userIdParam = userId || new URLSearchParams(window.location.search).get('userId') || MOCK_USER_ID;
+  
   return useQuery<Trade[]>({
-    queryKey: ['/api/trades', MOCK_USER_ID],
+    queryKey: ['/api/trades', userIdParam],
   });
 }
 
-export function useCreateTrade() {
+export function useCreateTrade(userId?: string | number) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const userIdParam = userId || new URLSearchParams(window.location.search).get('userId') || MOCK_USER_ID;
 
   return useMutation({
     mutationFn: (trade: Omit<TradeRequest, 'userId'>) => 
-      api.createTrade({ ...trade, userId: MOCK_USER_ID }),
+      api.createTrade({ ...trade, userId: Number(userIdParam) }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/trades'] });
       toast({
@@ -135,13 +142,14 @@ export function useUpdateMarketData() {
   });
 }
 
-export function useUpdateUserCredentials() {
+export function useUpdateUserCredentials(userId?: string | number) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const userIdParam = userId || new URLSearchParams(window.location.search).get('userId') || MOCK_USER_ID;
 
   return useMutation({
     mutationFn: (credentials: { apiKey: string; apiSecret: string; apiPassphrase: string }) =>
-      api.updateUserCredentials(MOCK_USER_ID, credentials),
+      api.updateUserCredentials(Number(userIdParam), credentials),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/user'] });
       toast({
