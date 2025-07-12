@@ -1,15 +1,15 @@
-import { createRestClient } from '@ln-markets/api';
+import { createRestClient } from "@ln-markets/api";
 
 export interface LNMarketsConfig {
   apiKey: string;
   secret: string;
   passphrase: string;
-  network?: 'mainnet' | 'testnet';
+  network?: "mainnet" | "testnet";
 }
 
 export interface FuturesTradeRequest {
-  type: 'l' | 'm'; // limit or market
-  side: 'b' | 's'; // buy or sell
+  type: "l" | "m"; // limit or market
+  side: "b" | "s"; // buy or sell
   margin: number; // in satoshis
   leverage: number;
   quantity?: number;
@@ -19,9 +19,9 @@ export interface FuturesTradeRequest {
 }
 
 export interface OptionsTradeRequest {
-  side: 'b'; // buy only for options
+  side: "b"; // buy only for options
   quantity: number;
-  settlement: 'physical' | 'cash';
+  settlement: "physical" | "cash";
   instrument_name: string;
 }
 
@@ -49,7 +49,7 @@ export class LNMarketsService {
       key: config.apiKey,
       secret: config.secret,
       passphrase: config.passphrase,
-      network: config.network || 'mainnet',
+      network: config.network || "mainnet",
     });
   }
 
@@ -68,11 +68,16 @@ export class LNMarketsService {
     return this.client.futuresNewTrade(trade);
   }
 
-  async getFuturesTrades(type: 'open' | 'closed' | 'pending' = 'open'): Promise<any[]> {
+  async getFuturesTrades(
+    type: "open" | "closed" | "pending" = "open",
+  ): Promise<any[]> {
     return this.client.futuresGetTrades({ type });
   }
 
-  async updateFuturesTrade(id: string, updates: { takeprofit?: number; stoploss?: number }): Promise<any> {
+  async updateFuturesTrade(
+    id: string,
+    updates: { takeprofit?: number; stoploss?: number },
+  ): Promise<any> {
     return this.client.futuresUpdateTrade({ id, ...updates });
   }
 
@@ -131,6 +136,8 @@ export class LNMarketsService {
   }
 }
 
-export function createLNMarketsService(config: LNMarketsConfig): LNMarketsService {
+export function createLNMarketsService(
+  config: LNMarketsConfig,
+): LNMarketsService {
   return new LNMarketsService(config);
 }
