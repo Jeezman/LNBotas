@@ -27,9 +27,16 @@ export function SettingsContent() {
   const { toast } = useToast();
 
   const handleDeleteAccount = async () => {
-    if (!user?.id) return;
+    console.log('Delete account button clicked');
+    console.log('Current user:', user);
+    
+    if (!user?.id) {
+      console.log('No user ID found, aborting delete');
+      return;
+    }
 
     if (confirmText !== "DELETE") {
+      console.log('Confirmation text incorrect:', confirmText);
       toast({
         title: "Confirmation Required",
         description: "Please type 'DELETE' to confirm account deletion",
@@ -38,11 +45,19 @@ export function SettingsContent() {
       return;
     }
 
+    console.log('Starting delete process for user ID:', user.id);
     setIsDeleting(true);
 
     try {
-      await apiRequest("DELETE", `/api/user/${user.id}`, {});
+      console.log('Making DELETE request to:', `/api/user/${user.id}`);
+      const response = await apiRequest("DELETE", `/api/user/${user.id}`, {});
+      console.log('Delete API response status:', response.status);
       
+      // Parse the response to get the actual result
+      const result = await response.json();
+      console.log('Delete API result:', result);
+      
+      console.log('Account deleted successfully, calling logout');
       // Use logout function which handles cleanup and redirect
       logout();
       
@@ -51,12 +66,14 @@ export function SettingsContent() {
         description: "Your account has been permanently deleted",
       });
     } catch (error: any) {
+      console.error('Delete account error:', error);
       toast({
         title: "Delete Failed",
         description: error.message || "Failed to delete account",
         variant: "destructive",
       });
     } finally {
+      console.log('Delete process finished, resetting state');
       setIsDeleting(false);
       setConfirmText("");
     }

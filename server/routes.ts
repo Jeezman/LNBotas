@@ -155,30 +155,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/user/:id", async (req, res) => {
     try {
+      console.log('DELETE /api/user/:id called with params:', req.params);
       const userId = parseInt(req.params.id);
+      console.log('Parsed user ID:', userId);
       
-      if (!userId) {
+      if (!userId || isNaN(userId)) {
+        console.log('Invalid user ID provided:', req.params.id);
         return res.status(400).json({ message: "User ID is required" });
       }
 
       // Check if user exists
+      console.log('Checking if user exists with ID:', userId);
       const user = await storage.getUser(userId);
+      console.log('User found:', user ? `${user.username} (ID: ${user.id})` : 'No user found');
+      
       if (!user) {
+        console.log('User not found with ID:', userId);
         return res.status(404).json({ message: "User not found" });
       }
 
       // Delete all user's trades first (foreign key constraint)
+      console.log('Fetching user trades for deletion...');
       const userTrades = await storage.getTradesByUserId(userId);
+      console.log(`Found ${userTrades.length} trades to delete`);
+      
       for (const trade of userTrades) {
+        console.log('Deleting trade ID:', trade.id);
         await storage.deleteTrade(trade.id);
       }
+      console.log('All user trades deleted');
 
       // Delete the user account
+      console.log('Deleting user account...');
       const success = await storage.deleteUser(userId);
+      console.log('Delete user result:', success);
+      
       if (!success) {
+        console.error('Failed to delete user account - storage returned false');
         return res.status(500).json({ message: "Failed to delete user account" });
       }
 
+      console.log('User account deleted successfully');
       res.json({ message: "Account deleted successfully" });
     } catch (error) {
       console.error('Error deleting user:', error);
