@@ -1,8 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, type MarketData, type Trade, type User, type TradeRequest } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
-
-const MOCK_USER_ID = 1; // For demo purposes
+import { useAuth } from '@/hooks/use-auth';
 
 export function useMarketData() {
   return useQuery<MarketData>({
@@ -12,34 +11,41 @@ export function useMarketData() {
 }
 
 export function useUser(userId?: string | number) {
-  const userIdParam = userId || new URLSearchParams(window.location.search).get('userId') || MOCK_USER_ID;
+  const { user: authUser } = useAuth();
+  const userIdParam = userId || authUser?.id;
   
   return useQuery<User>({
     queryKey: ['/api/user', userIdParam],
+    enabled: !!userIdParam, // Only run query if we have a user ID
   });
 }
 
 export function useActiveTrades(userId?: string | number) {
-  const userIdParam = userId || new URLSearchParams(window.location.search).get('userId') || MOCK_USER_ID;
+  const { user: authUser } = useAuth();
+  const userIdParam = userId || authUser?.id;
   
   return useQuery<Trade[]>({
     queryKey: ['/api/trades', userIdParam, 'active'],
     refetchInterval: 10000, // Refetch every 10 seconds
+    enabled: !!userIdParam, // Only run query if we have a user ID
   });
 }
 
 export function useTradeHistory(userId?: string | number) {
-  const userIdParam = userId || new URLSearchParams(window.location.search).get('userId') || MOCK_USER_ID;
+  const { user: authUser } = useAuth();
+  const userIdParam = userId || authUser?.id;
   
   return useQuery<Trade[]>({
     queryKey: ['/api/trades', userIdParam],
+    enabled: !!userIdParam, // Only run query if we have a user ID
   });
 }
 
 export function useCreateTrade(userId?: string | number) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const userIdParam = userId || new URLSearchParams(window.location.search).get('userId') || MOCK_USER_ID;
+  const { user: authUser } = useAuth();
+  const userIdParam = userId || authUser?.id;
 
   return useMutation({
     mutationFn: (trade: Omit<TradeRequest, 'userId'>) => 
@@ -145,7 +151,8 @@ export function useUpdateMarketData() {
 export function useUpdateUserCredentials(userId?: string | number) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const userIdParam = userId || new URLSearchParams(window.location.search).get('userId') || MOCK_USER_ID;
+  const { user: authUser } = useAuth();
+  const userIdParam = userId || authUser?.id;
 
   return useMutation({
     mutationFn: (credentials: { apiKey: string; apiSecret: string; apiPassphrase: string }) =>

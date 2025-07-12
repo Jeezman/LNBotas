@@ -6,7 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle, LogIn } from "lucide-react";
-import { apiRequest } from "@/lib/queryClient";
+import { useAuth } from "@/hooks/use-auth";
+import { Link } from "wouter";
 
 export default function LoginPage() {
   const [, setLocation] = useLocation();
@@ -14,6 +15,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const { login } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,11 +29,9 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      const response = await apiRequest("POST", "/api/user/login", { username, password });
-      const user = await response.json();
-
-      // Login successful, redirect to dashboard with user ID
-      setLocation(`/dashboard?userId=${user.id}`);
+      await login(username, password);
+      // Login successful, redirect to dashboard
+      setLocation("/dashboard");
     } catch (error: any) {
       setError(error.message || "Login failed. Please try again.");
     } finally {

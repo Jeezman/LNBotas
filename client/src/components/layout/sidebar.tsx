@@ -11,8 +11,7 @@ import {
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
-import { useUser } from "@/hooks/use-trading";
-import { queryClient } from "@/lib/queryClient";
+import { useAuth } from "@/hooks/use-auth";
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: ChartLine, current: true },
@@ -25,15 +24,8 @@ const navigation = [
 ];
 
 export function Sidebar() {
-  const [location, navigate] = useLocation();
-  const { data: user } = useUser();
-
-  const handleLogout = () => {
-    // Clear all cached data
-    queryClient.clear();
-    // Redirect to login page
-    navigate('/');
-  };
+  const [location] = useLocation();
+  const { user, logout } = useAuth();
 
   return (
     <aside className="w-64 bg-white shadow-lg border-r border-gray-200 flex flex-col">
@@ -87,7 +79,7 @@ export function Sidebar() {
         </Link>
         
         <button
-          onClick={handleLogout}
+          onClick={logout}
           className="w-full flex items-center space-x-3 hover:bg-red-50 rounded-lg p-2 transition-colors text-red-600 hover:text-red-700"
         >
           <LogOut className="w-4 h-4" />

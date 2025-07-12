@@ -16,14 +16,14 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { useUser } from "@/hooks/use-trading";
+import { useAuth } from "@/hooks/use-auth";
 
 export function SettingsContent() {
   const [confirmText, setConfirmText] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
-  const { data: user } = useUser();
+  const { user, logout } = useAuth();
   const { toast } = useToast();
 
   const handleDeleteAccount = async () => {
@@ -43,9 +43,8 @@ export function SettingsContent() {
     try {
       await apiRequest("DELETE", `/api/user/${user.id}`, {});
       
-      // Clear all data and redirect to login
-      queryClient.clear();
-      window.location.href = '/';
+      // Use logout function which handles cleanup and redirect
+      logout();
       
       toast({
         title: "Account Deleted",
@@ -120,15 +119,17 @@ export function SettingsContent() {
             <AlertDialogContent>
               <AlertDialogHeader>
                 <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                <AlertDialogDescription className="space-y-2">
-                  <p>This action cannot be undone. This will permanently delete your account and remove all your data from our servers.</p>
-                  <p>This includes:</p>
-                  <ul className="list-disc list-inside text-sm space-y-1">
-                    <li>Your trading history and positions</li>
-                    <li>API credentials and connections</li>
-                    <li>Account settings and preferences</li>
-                    <li>All personal data associated with your account</li>
-                  </ul>
+                <AlertDialogDescription>
+                  <div className="space-y-2">
+                    <p>This action cannot be undone. This will permanently delete your account and remove all your data from our servers.</p>
+                    <p>This includes:</p>
+                    <ul className="list-disc list-inside text-sm space-y-1">
+                      <li>Your trading history and positions</li>
+                      <li>API credentials and connections</li>
+                      <li>Account settings and preferences</li>
+                      <li>All personal data associated with your account</li>
+                    </ul>
+                  </div>
                 </AlertDialogDescription>
               </AlertDialogHeader>
               
