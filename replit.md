@@ -18,10 +18,12 @@ Preferred communication style: Simple, everyday language.
 - **Database Cleanup**: Removed demo user and sample market data from database initialization
 - **Real API Integration**: Application now operates exclusively with authentic LN Markets API credentials
 - **Navigation Structure**: Restructured application to maintain sidebar across all pages, making dashboard a layout wrapper that shows different content based on route
-- **User Profile Integration**: Added comprehensive user profile page as subpage within dashboard layout, including API credentials management
+- **User Profile Integration**: Added comprehensive user profile page as subpage within dashboard layout
 - **Layout System**: All navigation items (Dashboard, User Profile, Futures, Options, History, Portfolio, Settings) now operate as subpages maintaining consistent sidebar navigation
 - **Authentication Context**: Added React Context-based authentication system with session storage for persistent login state
 - **Route Protection**: Implemented protected routes that redirect unauthenticated users to login page
+- **Automatic Dashboard Redirection**: Added PublicRoute component to automatically redirect authenticated users from login/register pages to dashboard
+- **API Credentials Management**: Moved LN Markets API credentials form from user profile page to settings page for better organization
 - **Delete Account Functionality**: Added comprehensive account deletion feature in settings with confirmation dialog and proper data cleanup
 - **Logout Navigation**: Added logout button to sidebar with proper session cleanup and redirect functionality
 
