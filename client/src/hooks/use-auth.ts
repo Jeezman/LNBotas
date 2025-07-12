@@ -6,6 +6,8 @@ interface AuthUser {
   id: number;
   username: string;
   apiKey: string | null;
+  apiSecret: string | null;
+  apiPassphrase: string | null;
   balance: string | null;
   balanceUSD: string | null;
 }
@@ -34,22 +36,32 @@ export function useAuthState() {
   const [, navigate] = useLocation();
 
   useEffect(() => {
+    console.log('Auth useEffect: Checking for stored user...');
     // Check if user is stored in sessionStorage
     const storedUser = sessionStorage.getItem('auth_user');
+    console.log('Auth useEffect: Stored user data:', storedUser);
     if (storedUser) {
       try {
-        setUser(JSON.parse(storedUser));
+        const parsedUser = JSON.parse(storedUser);
+        console.log('Auth useEffect: Parsed user:', parsedUser);
+        setUser(parsedUser);
       } catch (e) {
+        console.log('Auth useEffect: Error parsing stored user, removing from storage');
         sessionStorage.removeItem('auth_user');
       }
     }
     setIsLoading(false);
+    console.log('Auth useEffect: Loading complete');
   }, []);
 
   const login = async (username: string, password: string): Promise<AuthUser> => {
-    const user = await apiRequest('POST', '/api/login', { username, password });
+    console.log('Login function called with:', { username });
+    const response = await apiRequest('POST', '/api/login', { username, password });
+    const user = await response.json();
+    console.log('Login response parsed:', user);
     setUser(user);
     sessionStorage.setItem('auth_user', JSON.stringify(user));
+    console.log('User set in auth context and session storage');
     return user;
   };
 

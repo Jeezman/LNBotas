@@ -29,6 +29,8 @@ export function SettingsContent() {
   const handleDeleteAccount = async () => {
     console.log('Delete account button clicked');
     console.log('Current user:', user);
+    console.log('User ID:', user?.id);
+    console.log('User keys:', user ? Object.keys(user) : 'No user object');
     
     if (!user?.id) {
       console.log('No user ID found, aborting delete');
