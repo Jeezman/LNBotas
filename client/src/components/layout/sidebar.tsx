@@ -12,6 +12,7 @@ import {
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { useUser } from "@/hooks/use-trading";
+import { queryClient } from "@/lib/queryClient";
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: ChartLine, current: true },
@@ -24,8 +25,15 @@ const navigation = [
 ];
 
 export function Sidebar() {
-  const [location] = useLocation();
+  const [location, navigate] = useLocation();
   const { data: user } = useUser();
+
+  const handleLogout = () => {
+    // Clear all cached data
+    queryClient.clear();
+    // Redirect to login page
+    navigate('/');
+  };
 
   return (
     <aside className="w-64 bg-white shadow-lg border-r border-gray-200 flex flex-col">
@@ -65,7 +73,7 @@ export function Sidebar() {
         </ul>
       </nav>
       
-      <div className="p-6 border-t border-gray-200">
+      <div className="p-6 border-t border-gray-200 space-y-3">
         <Link href="/user" className="flex items-center space-x-3 hover:bg-gray-50 rounded-lg p-2 transition-colors">
           <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
             <User className="text-gray-600 h-4 w-4" />
@@ -77,6 +85,14 @@ export function Sidebar() {
             </p>
           </div>
         </Link>
+        
+        <button
+          onClick={handleLogout}
+          className="w-full flex items-center space-x-3 hover:bg-red-50 rounded-lg p-2 transition-colors text-red-600 hover:text-red-700"
+        >
+          <LogOut className="w-4 h-4" />
+          <span className="text-sm font-medium">Sign Out</span>
+        </button>
       </div>
     </aside>
   );
