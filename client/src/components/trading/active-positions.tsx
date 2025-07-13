@@ -9,14 +9,15 @@ import {
   TableHeader, 
   TableRow 
 } from "@/components/ui/table";
-import { useActiveTrades, useCloseTrade, useCloseAllTrades } from "@/hooks/use-trading";
+import { useActiveTrades, useCloseTrade, useCloseAllTrades, useSyncTrades } from "@/hooks/use-trading";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Edit, X } from "lucide-react";
+import { Edit, X, RefreshCw } from "lucide-react";
 
 export function ActivePositions() {
   const { data: trades = [], isLoading } = useActiveTrades();
   const closeTrade = useCloseTrade();
   const closeAllTrades = useCloseAllTrades();
+  const syncTrades = useSyncTrades();
 
   if (isLoading) {
     return (
@@ -43,21 +44,36 @@ export function ActivePositions() {
     closeAllTrades.mutate();
   };
 
+  const handleSync = () => {
+    syncTrades.mutate();
+  };
+
   return (
     <Card>
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle className="text-lg font-semibold text-gray-900">Active Positions</CardTitle>
-          {trades.length > 0 && (
+          <div className="flex items-center space-x-2">
             <Button 
               variant="outline" 
               size="sm"
-              onClick={handleCloseAll}
-              disabled={closeAllTrades.isPending}
+              onClick={handleSync}
+              disabled={syncTrades.isPending}
             >
-              Close All
+              <RefreshCw className={`h-4 w-4 mr-2 ${syncTrades.isPending ? 'animate-spin' : ''}`} />
+              Sync
             </Button>
-          )}
+            {trades.length > 0 && (
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={handleCloseAll}
+                disabled={closeAllTrades.isPending}
+              >
+                Close All
+              </Button>
+            )}
+          </div>
         </div>
       </CardHeader>
       <CardContent>

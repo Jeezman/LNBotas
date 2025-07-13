@@ -610,8 +610,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         if (existingTrade) {
           // Update existing trade with latest data from LN Markets
+          const newStatus = lnTrade.closed ? "closed" : "open";
+          logRequest(req, `Updating trade ${existingTrade.id} from ${existingTrade.status} to ${newStatus}`, {
+            lnMarketsId: lnTrade.id,
+            closed: lnTrade.closed,
+            exitPrice: lnTrade.exit_price
+          });
+          
           await storage.updateTrade(existingTrade.id, {
-            status: lnTrade.status ? "closed" : "open",
+            status: newStatus,
             entryPrice: lnTrade.price?.toString(),
             exitPrice: lnTrade.exit_price?.toString(),
             pnl: lnTrade.pl?.toString(),
@@ -660,8 +667,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           );
 
           if (existingTrade) {
+            const newStatus = lnTrade.closed ? "closed" : "open";
+            logRequest(req, `Updating options trade ${existingTrade.id} from ${existingTrade.status} to ${newStatus}`, {
+              lnMarketsId: lnTrade.id,
+              closed: lnTrade.closed,
+              exitPrice: lnTrade.exit_price
+            });
+            
             await storage.updateTrade(existingTrade.id, {
-              status: lnTrade.closed ? "closed" : "open",
+              status: newStatus,
               entryPrice: lnTrade.price?.toString(),
               exitPrice: lnTrade.exit_price?.toString(),
               pnl: lnTrade.pl?.toString(),
