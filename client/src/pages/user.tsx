@@ -217,10 +217,17 @@ export default function UserPage() {
                     <div key={deposit.id} className="p-4 border rounded-lg bg-muted/50">
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
-                          <Badge variant={
-                            deposit.status === 'confirmed' ? 'default' :
-                            deposit.status === 'pending' ? 'secondary' : 'destructive'
-                          }>
+                          <Badge 
+                            variant={
+                              deposit.status === 'completed' || deposit.status === 'confirmed' ? 'default' :
+                              deposit.status === 'pending' ? 'secondary' : 'destructive'
+                            }
+                            className={
+                              deposit.status === 'completed' || deposit.status === 'confirmed' 
+                                ? 'bg-green-600 text-white hover:bg-green-700' 
+                                : ''
+                            }
+                          >
                             {deposit.status}
                           </Badge>
                           {deposit.amount && (
