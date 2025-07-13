@@ -38,6 +38,7 @@ export default function FuturesPage() {
   });
 
   const getStatusIcon = (status: string) => {
+    console.log('status ', status)
     switch (status) {
       case "open":
         return <TrendingUp className="h-4 w-4 text-green-500" />;
