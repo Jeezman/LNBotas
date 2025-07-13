@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 import { useLocation } from "wouter";
 import UserPage from "./user";
+import FuturesPage from "./futures";
 
 function DashboardContent() {
   return (
@@ -79,7 +80,7 @@ export default function Dashboard() {
       case '/user':
         return <UserPage />;
       case '/futures':
-        return <PlaceholderPage title="Futures Trading" />;
+        return <FuturesPage />;
       case '/options':
         return <PlaceholderPage title="Options Trading" />;
       case '/history':
