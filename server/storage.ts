@@ -286,18 +286,28 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateMarketData(data: InsertMarketData): Promise<MarketData> {
-    const [marketDataResult] = await db
-      .insert(marketData)
-      .values(data)
-      .onConflictDoUpdate({
-        target: marketData.symbol,
-        set: {
+    // Check if market data already exists
+    const existing = await this.getMarketData(data.symbol);
+    
+    if (existing) {
+      // Update existing record
+      const [updated] = await db
+        .update(marketData)
+        .set({
           ...data,
           updatedAt: new Date(),
-        },
-      })
-      .returning();
-    return marketDataResult;
+        })
+        .where(eq(marketData.symbol, data.symbol))
+        .returning();
+      return updated;
+    } else {
+      // Insert new record
+      const [inserted] = await db
+        .insert(marketData)
+        .values(data)
+        .returning();
+      return inserted;
+    }
   }
 }
 

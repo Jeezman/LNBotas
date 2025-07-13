@@ -40,7 +40,7 @@ export const trades = pgTable("trades", {
 
 export const marketData = pgTable("market_data", {
   id: serial("id").primaryKey(),
-  symbol: text("symbol").notNull(), // 'BTC/USD'
+  symbol: text("symbol").notNull().unique(), // 'BTC/USD'
   lastPrice: decimal("last_price", { precision: 18, scale: 2 }),
   markPrice: decimal("mark_price", { precision: 18, scale: 2 }),
   indexPrice: decimal("index_price", { precision: 18, scale: 2 }),

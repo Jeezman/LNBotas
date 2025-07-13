@@ -4,15 +4,9 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { User, Bitcoin, DollarSign } from "lucide-react";
-import { useEffect } from "react";
 
 export default function UserPage() {
-  const { data: user, isLoading, refetch } = useUser();
-  
-  // Refetch user data when component mounts to ensure latest API status
-  useEffect(() => {
-    refetch();
-  }, [refetch]);
+  const { data: user, isLoading } = useUser();
 
   if (isLoading) {
     return (
