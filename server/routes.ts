@@ -737,28 +737,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       logRequest(req, "Calling LN Markets API to generate deposit address");
       const depositResponse = await lnMarketsService.generateDepositAddress({ amount });
       
+      // Calculate expiry time
+      const expiresAt = new Date(Date.now() + (depositResponse.expiry * 60 * 1000)); // expiry is in minutes
+      
       // Store deposit in database
       const deposit = await storage.createDeposit({
         userId,
-        lnMarketsId: depositResponse.id,
-        address: depositResponse.address,
+        lnMarketsId: depositResponse.depositId,
+        address: depositResponse.paymentRequest,
         amount: amount || null,
         status: 'pending',
-        expiresAt: depositResponse.expires_at ? new Date(depositResponse.expires_at) : null,
+        expiresAt,
       });
 
       logSuccess(req, "Deposit address generated successfully", { 
         depositId: deposit.id, 
-        address: depositResponse.address,
-        amount
+        paymentRequest: depositResponse.paymentRequest,
+        amount,
+        expiry: depositResponse.expiry
       });
       
       res.json({
         id: deposit.id,
-        address: depositResponse.address,
+        address: depositResponse.paymentRequest,
         amount: amount,
         status: deposit.status,
         expiresAt: deposit.expiresAt,
+        expiry: depositResponse.expiry,
       });
     } catch (error) {
       logError(req, "Deposit address generation failed", error);

@@ -17,7 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 const depositFormSchema = z.object({
   amount: z.string().min(1, "Amount is required").refine(
     (val) => {
-      const num = parseFloat(val);
+      const num = parseInt(val);
       return !isNaN(num) && num > 0;
     },
     "Amount must be a positive number"
@@ -42,7 +42,7 @@ export default function UserPage() {
   });
 
   const onSubmitDeposit = async (values: DepositFormValues) => {
-    const amount = Math.floor(parseFloat(values.amount) * 100000000); // Convert to satoshis
+    const amount = parseInt(values.amount); // Amount is already in satoshis
     generateDeposit.mutate({ amount });
   };
 
@@ -153,18 +153,18 @@ export default function UserPage() {
                   name="amount"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Amount (BTC)</FormLabel>
+                      <FormLabel>Amount (Satoshis)</FormLabel>
                       <FormControl>
                         <Input 
-                          placeholder="0.00100000" 
+                          placeholder="1337" 
                           type="number"
-                          step="0.00000001"
-                          min="0.00000001"
+                          step="1"
+                          min="1"
                           {...field} 
                         />
                       </FormControl>
                       <FormDescription>
-                        Enter the amount in BTC you want to deposit
+                        Enter the amount in satoshis you want to deposit
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
@@ -219,7 +219,7 @@ export default function UserPage() {
                           </Badge>
                           {deposit.amount && (
                             <span className="text-sm text-muted-foreground">
-                              {(deposit.amount / 100000000).toFixed(8)} BTC
+                              {deposit.amount} sats
                             </span>
                           )}
                         </div>
