@@ -1,12 +1,13 @@
 import { useState } from "react";
-import { useActiveTrades, useTradeHistory } from "@/hooks/use-trading";
+import { useActiveTrades, useTradeHistory, useSyncTrades } from "@/hooks/use-trading";
+import { useAuth } from "@/hooks/use-auth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { TrendingUp, TrendingDown, Clock, CheckCircle, XCircle, Filter } from "lucide-react";
+import { TrendingUp, TrendingDown, Clock, CheckCircle, XCircle, Filter, RefreshCw } from "lucide-react";
 import { Trade } from "@/lib/api";
 import { formatDistanceToNow } from "date-fns";
 
@@ -17,8 +18,10 @@ export default function FuturesPage() {
   const [statusFilter, setStatusFilter] = useState<TradeStatus>("all");
   const [typeFilter, setTypeFilter] = useState<TradeType>("all");
   
+  const { user } = useAuth();
   const { data: activeTrades = [], isLoading: activeLoading } = useActiveTrades();
   const { data: allTrades = [], isLoading: historyLoading } = useTradeHistory();
+  const syncTrades = useSyncTrades(user?.id);
 
   const isLoading = activeLoading || historyLoading;
 
@@ -169,16 +172,29 @@ export default function FuturesPage() {
         </Card>
       </div>
 
-      {/* Filters */}
+      {/* Filters and Sync */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Filter className="h-5 w-5" />
-            Trade Filters
-          </CardTitle>
-          <CardDescription>
-            Filter your trades by status and type
-          </CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Filter className="h-5 w-5" />
+                Trade Filters
+              </CardTitle>
+              <CardDescription>
+                Filter your trades by status and type
+              </CardDescription>
+            </div>
+            <Button 
+              onClick={() => syncTrades.mutate()}
+              disabled={syncTrades.isPending}
+              variant="outline"
+              className="flex items-center gap-2"
+            >
+              <RefreshCw className={`h-4 w-4 ${syncTrades.isPending ? 'animate-spin' : ''}`} />
+              {syncTrades.isPending ? 'Syncing...' : 'Sync from LN Markets'}
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="flex gap-4">

@@ -65,14 +65,6 @@ export const insertUserSchema = createInsertSchema(users).pick({
 
 export const insertTradeSchema = createInsertSchema(trades).omit({
   id: true,
-  lnMarketsId: true,
-  status: true,
-  entryPrice: true,
-  exitPrice: true,
-  pnl: true,
-  pnlUSD: true,
-  fee: true,
-  liquidationPrice: true,
   createdAt: true,
   updatedAt: true,
 });

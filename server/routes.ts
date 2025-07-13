@@ -471,6 +471,127 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Sync trades from LN Markets
+  app.post("/api/trades/sync", async (req, res) => {
+    try {
+      const { userId } = req.body;
+      
+      if (!userId) {
+        return res.status(400).json({ message: "User ID is required" });
+      }
+
+      const user = await storage.getUser(userId);
+      if (!user || !user.apiKey || !user.apiSecret || !user.apiPassphrase) {
+        return res.status(400).json({ message: "User API credentials not found" });
+      }
+
+      const lnMarketsService = createLNMarketsService({
+        apiKey: user.apiKey,
+        secret: user.apiSecret,
+        passphrase: user.apiPassphrase,
+        network: "mainnet"
+      });
+
+      // Fetch futures trades from LN Markets
+      const futuresTrades = await lnMarketsService.getFuturesTrades();
+      let syncedCount = 0;
+      let updatedCount = 0;
+
+      for (const lnTrade of futuresTrades) {
+        // Check if trade already exists in our database
+        const existingTrades = await storage.getTradesByUserId(userId);
+        const existingTrade = existingTrades.find(t => t.lnMarketsId === lnTrade.id);
+
+        if (existingTrade) {
+          // Update existing trade with latest data from LN Markets
+          await storage.updateTrade(existingTrade.id, {
+            status: lnTrade.closed ? 'closed' : 'open',
+            entryPrice: lnTrade.price?.toString(),
+            exitPrice: lnTrade.exit_price?.toString(),
+            pnl: lnTrade.pl?.toString(),
+            pnlUSD: lnTrade.pl_usd?.toString(),
+            liquidationPrice: lnTrade.liquidation?.toString(),
+            updatedAt: new Date(),
+          });
+          updatedCount++;
+        } else {
+          // Create new trade from LN Markets data
+          await storage.createTrade({
+            userId: userId,
+            lnMarketsId: lnTrade.id,
+            type: 'futures',
+            side: lnTrade.side === 'b' ? 'buy' : 'sell',
+            orderType: lnTrade.type === 'l' ? 'limit' : 'market',
+            status: lnTrade.closed ? 'closed' : 'open',
+            entryPrice: lnTrade.price?.toString(),
+            exitPrice: lnTrade.exit_price?.toString(),
+            margin: lnTrade.margin,
+            leverage: lnTrade.leverage?.toString(),
+            quantity: lnTrade.quantity?.toString(),
+            takeProfit: lnTrade.takeprofit?.toString(),
+            stopLoss: lnTrade.stoploss?.toString(),
+            pnl: lnTrade.pl?.toString(),
+            pnlUSD: lnTrade.pl_usd?.toString(),
+            liquidationPrice: lnTrade.liquidation?.toString(),
+            instrumentName: 'BTC/USD',
+          });
+          syncedCount++;
+        }
+      }
+
+      // Also fetch options trades
+      try {
+        const optionsTrades = await lnMarketsService.getOptionsTrades();
+        
+        for (const lnTrade of optionsTrades) {
+          const existingTrades = await storage.getTradesByUserId(userId);
+          const existingTrade = existingTrades.find(t => t.lnMarketsId === lnTrade.id);
+
+          if (existingTrade) {
+            await storage.updateTrade(existingTrade.id, {
+              status: lnTrade.closed ? 'closed' : 'open',
+              entryPrice: lnTrade.price?.toString(),
+              exitPrice: lnTrade.exit_price?.toString(),
+              pnl: lnTrade.pl?.toString(),
+              pnlUSD: lnTrade.pl_usd?.toString(),
+              updatedAt: new Date(),
+            });
+            updatedCount++;
+          } else {
+            await storage.createTrade({
+              userId: userId,
+              lnMarketsId: lnTrade.id,
+              type: 'options',
+              side: 'buy', // Options are always buy
+              orderType: 'market',
+              status: lnTrade.closed ? 'closed' : 'open',
+              entryPrice: lnTrade.price?.toString(),
+              exitPrice: lnTrade.exit_price?.toString(),
+              quantity: lnTrade.quantity?.toString(),
+              pnl: lnTrade.pl?.toString(),
+              pnlUSD: lnTrade.pl_usd?.toString(),
+              instrumentName: lnTrade.instrument,
+              settlement: lnTrade.settlement,
+            });
+            syncedCount++;
+          }
+        }
+      } catch (optionsError) {
+        console.log("No options trades or error fetching options:", optionsError);
+      }
+
+      res.json({ 
+        message: "Trades synced successfully", 
+        syncedCount, 
+        updatedCount,
+        totalProcessed: syncedCount + updatedCount
+      });
+    } catch (error) {
+      console.error("Error syncing trades:", error);
+      res.status(500).json({ message: "Failed to sync trades from LN Markets" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

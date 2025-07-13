@@ -225,3 +225,37 @@ export function useUpdateUserCredentials(userId?: string | number) {
     },
   });
 }
+
+export function useSyncTrades(userId?: string | number) {
+  const { toast } = useToast();
+  const { user: authUser } = useAuth();
+  const userIdParam = userId || authUser?.id;
+  
+  return useMutation({
+    mutationFn: async () => {
+      if (!userIdParam) throw new Error("User ID is required");
+      
+      return apiRequest(`/api/trades/sync`, {
+        method: "POST",
+        body: JSON.stringify({ userId: userIdParam }),
+      });
+    },
+    onSuccess: (data: any) => {
+      // Invalidate all trade-related queries to refresh the data
+      queryClient.invalidateQueries({ queryKey: ['/api/trades', userIdParam] });
+      queryClient.invalidateQueries({ queryKey: ['/api/trades', userIdParam, 'active'] });
+      
+      toast({
+        title: "Trades Synced",
+        description: `Synced ${data.totalProcessed} trades from LN Markets (${data.syncedCount} new, ${data.updatedCount} updated)`,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Sync Failed",
+        description: error.message || "Failed to sync trades from LN Markets",
+        variant: "destructive",
+      });
+    },
+  });
+}
