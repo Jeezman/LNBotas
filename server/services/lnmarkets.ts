@@ -150,33 +150,27 @@ export class LNMarketsService {
   // Deposit operations
   async generateDepositAddress(request: DepositRequest = {}): Promise<DepositResponse> {
     try {
-      // Note: LN Markets API does not currently expose public deposit endpoints
-      // This would require manual deposit generation through their web interface
-      // For integration purposes, we generate a realistic response format
+      console.log('Calling LN Markets userDeposit API with amount:', request.amount);
       
-      console.log('Note: LN Markets deposit generation would require web interface or special API access');
-      console.log('Request payload:', request);
+      // Call the actual LN Markets userDeposit function
+      const depositResponse = await this.client.userDeposit({
+        amount: request.amount || 100000 // Default to 100k satoshis if not specified
+      });
+      
+      console.log('LN Markets deposit response:', depositResponse);
       
       const crypto = await import('crypto');
       
-      // Generate dynamic values for the response
-      const depositId = crypto.randomUUID();
-      const amount = request.amount || 100000; // Default to 100k satoshis if not specified
-      
-      // Generate a realistic Lightning invoice format (this is for demonstration)
-      // In reality, this would come from the LN Markets API
-      const invoiceHash = crypto.randomBytes(32).toString('hex');
-      const paymentRequest = `lnbc${amount}n1pj${invoiceHash.substring(0, 8)}pp5${invoiceHash.substring(8, 40)}${crypto.randomBytes(100).toString('hex')}`;
-      
+      // Map the LN Markets response to our expected format
       const response: DepositResponse = {
-        depositId,
-        paymentRequest,
-        expiry: 90 // 90 minutes standard Lightning invoice expiry
+        depositId: depositResponse.id || depositResponse.depositId || crypto.randomUUID(),
+        paymentRequest: depositResponse.payment_request || depositResponse.paymentRequest,
+        expiry: depositResponse.expiry || 90
       };
       
       return response;
     } catch (error) {
-      console.error('Error generating deposit address:', error);
+      console.error('Error generating deposit address via LN Markets API:', error);
       throw error;
     }
   }
