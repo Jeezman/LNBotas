@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertTradeSchema } from "@shared/schema";
@@ -6,9 +6,29 @@ import { createLNMarketsService } from "./services/lnmarkets";
 import { z } from "zod";
 import bcrypt from "bcrypt";
 
+// Enhanced logging utility
+function logRequest(req: Request, action: string, details?: any) {
+  const timestamp = new Date().toISOString();
+  const userInfo = req.body?.userId ? `[User: ${req.body.userId}]` : '';
+  console.log(`[${timestamp}] ${req.method} ${req.path} ${userInfo} - ${action}`, details ? JSON.stringify(details) : '');
+}
+
+function logError(req: Request, action: string, error: any) {
+  const timestamp = new Date().toISOString();
+  const userInfo = req.body?.userId ? `[User: ${req.body.userId}]` : '';
+  console.error(`[${timestamp}] ERROR ${req.method} ${req.path} ${userInfo} - ${action}:`, error.message || error);
+}
+
+function logSuccess(req: Request, action: string, result?: any) {
+  const timestamp = new Date().toISOString();
+  const userInfo = req.body?.userId ? `[User: ${req.body.userId}]` : '';
+  console.log(`[${timestamp}] SUCCESS ${req.method} ${req.path} ${userInfo} - ${action}`, result ? `Result: ${JSON.stringify(result)}` : '');
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Market data endpoints
   app.get("/api/market/ticker", async (req, res) => {
+    logRequest(req, "Fetching market ticker data");
     try {
       // Get latest market data from storage or fetch from LN Markets
       const marketData = await storage.getMarketData('BTC/USD');
@@ -30,15 +50,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      logSuccess(req, "Market ticker data retrieved");
       res.json(marketData);
     } catch (error) {
-      console.error('Error fetching market ticker:', error);
+      logError(req, "Failed to fetch market ticker", error);
       res.status(500).json({ message: "Failed to fetch market data" });
     }
   });
 
   // Update market data (called periodically)
   app.post("/api/market/update", async (req, res) => {
+    logRequest(req, "Updating market data from LN Markets");
     try {
       // For market data, we can use any user's credentials or skip if none available
       // Market data is public information that doesn't require specific user credentials
@@ -69,6 +91,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // User endpoints
   app.post("/api/user/register", async (req, res) => {
+    logRequest(req, "User registration attempt", { username: req.body.username });
     try {
       const { username, password } = req.body;
       
@@ -100,14 +123,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Don't return sensitive data
       const { password: _, ...safeUser } = user;
+      logSuccess(req, "User registered successfully", { userId: user.id, username: user.username });
       res.json(safeUser);
     } catch (error) {
-      console.error('Error creating user:', error);
+      logError(req, "User registration failed", error);
       res.status(500).json({ message: "Failed to create user" });
     }
   });
 
   app.post("/api/login", async (req, res) => {
+    logRequest(req, "User login attempt", { username: req.body.username });
     try {
       const { username, password } = req.body;
       
@@ -130,9 +155,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Don't return sensitive data
       const { password: _, ...safeUser } = user;
+      logSuccess(req, "User logged in successfully", { userId: user.id, username: user.username });
       res.json(safeUser);
     } catch (error) {
-      console.error('Error logging in user:', error);
+      logError(req, "User login failed", error);
       res.status(500).json({ message: "Failed to log in" });
     }
   });
@@ -206,6 +232,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post("/api/user/:id/credentials", async (req, res) => {
+    logRequest(req, "Updating user API credentials", { userId: req.params.id });
     try {
       const userId = parseInt(req.params.id);
       const { apiKey, apiSecret, apiPassphrase } = req.body;
@@ -473,15 +500,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Sync trades from LN Markets
   app.post("/api/trades/sync", async (req, res) => {
+    logRequest(req, "Starting trade sync from LN Markets");
     try {
       const { userId } = req.body;
       
       if (!userId) {
+        logError(req, "Sync failed - no user ID provided", new Error("Missing userId"));
         return res.status(400).json({ message: "User ID is required" });
       }
 
+      logRequest(req, "Fetching user credentials for sync", { userId });
       const user = await storage.getUser(userId);
       if (!user || !user.apiKey || !user.apiSecret || !user.apiPassphrase) {
+        logError(req, "Sync failed - user credentials not found", new Error("Missing API credentials"));
         return res.status(400).json({ message: "User API credentials not found" });
       }
 
@@ -493,9 +524,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       // Fetch futures trades from LN Markets
+      logRequest(req, "Fetching futures trades from LN Markets API");
       const futuresTrades = await lnMarketsService.getFuturesTrades();
       let syncedCount = 0;
       let updatedCount = 0;
+      logRequest(req, "Processing futures trades", { tradesFound: futuresTrades.length });
 
       for (const lnTrade of futuresTrades) {
         // Check if trade already exists in our database
@@ -541,7 +574,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Also fetch options trades
       try {
+        logRequest(req, "Fetching options trades from LN Markets API");
         const optionsTrades = await lnMarketsService.getOptionsTrades();
+        logRequest(req, "Processing options trades", { tradesFound: optionsTrades.length });
         
         for (const lnTrade of optionsTrades) {
           const existingTrades = await storage.getTradesByUserId(userId);
@@ -577,17 +612,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
       } catch (optionsError) {
-        console.log("No options trades or error fetching options:", optionsError);
+        logError(req, "Error fetching options trades", optionsError);
       }
 
-      res.json({ 
+      const result = {
         message: "Trades synced successfully", 
         syncedCount, 
         updatedCount,
         totalProcessed: syncedCount + updatedCount
-      });
+      };
+      logSuccess(req, "Trade sync completed successfully", result);
+      res.json(result);
     } catch (error) {
-      console.error("Error syncing trades:", error);
+      logError(req, "Trade sync failed", error);
       res.status(500).json({ message: "Failed to sync trades from LN Markets" });
     }
   });
