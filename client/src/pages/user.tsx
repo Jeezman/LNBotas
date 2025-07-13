@@ -1,4 +1,4 @@
-import { useUser, useDeposits, useGenerateDeposit, useSyncDeposits } from "@/hooks/use-trading";
+import { useUser, useDeposits, useGenerateDeposit, useSyncDeposits, useCheckDepositStatus } from "@/hooks/use-trading";
 import { useAuth } from "@/hooks/use-auth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -32,6 +32,7 @@ export default function UserPage() {
   const { data: deposits = [], refetch: refetchDeposits } = useDeposits(authUser?.id);
   const generateDeposit = useGenerateDeposit(authUser?.id);
   const syncDeposits = useSyncDeposits(authUser?.id);
+  const checkDepositStatus = useCheckDepositStatus();
   const { toast } = useToast();
   
   const depositForm = useForm<DepositFormValues>({
@@ -56,6 +57,11 @@ export default function UserPage() {
 
   const handleSyncDeposits = () => {
     syncDeposits.mutate();
+  };
+
+  const handleCheckDepositStatus = (depositId: number) => {
+    if (!authUser?.id) return;
+    checkDepositStatus.mutate({ depositId, userId: authUser.id });
   };
 
   if (isLoading) {
@@ -223,13 +229,29 @@ export default function UserPage() {
                             </span>
                           )}
                         </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleCopyAddress(deposit.address)}
-                        >
-                          <Copy className="h-4 w-4" />
-                        </Button>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => handleCheckDepositStatus(deposit.id)}
+                            disabled={checkDepositStatus.isPending}
+                            title="Check payment status"
+                          >
+                            {checkDepositStatus.isPending ? (
+                              <RefreshCw className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <RefreshCw className="h-4 w-4" />
+                            )}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleCopyAddress(deposit.address)}
+                            title="Copy deposit address"
+                          >
+                            <Copy className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
                       <div className="bg-background p-3 rounded border font-mono text-xs break-all">
                         {deposit.address}

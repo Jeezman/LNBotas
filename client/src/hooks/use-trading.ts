@@ -331,3 +331,39 @@ export function useSyncDeposits(userId?: string | number) {
     },
   });
 }
+
+export function useCheckDepositStatus() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async ({ depositId, userId }: { depositId: number; userId: number }) => {
+      const response = await apiRequest("POST", `/api/deposits/${depositId}/check`, {
+        userId: Number(userId)
+      });
+      return response.json();
+    },
+    onSuccess: (data: any, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/deposits", Number(variables.userId)] });
+      
+      const statusMessage = data.status === "completed" 
+        ? "Payment confirmed! Deposit completed successfully."
+        : data.status === "failed"
+        ? "Payment failed or expired."
+        : "Payment still pending...";
+        
+      toast({
+        title: "Deposit Status Updated",
+        description: statusMessage,
+        variant: data.status === "completed" ? "default" : "destructive",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Status Check Failed",
+        description: error.message || "Failed to check deposit status",
+        variant: "destructive",
+      });
+    },
+  });
+}

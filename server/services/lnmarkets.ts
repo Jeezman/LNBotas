@@ -177,7 +177,10 @@ export class LNMarketsService {
 
   async getDepositHistory(): Promise<any[]> {
     try {
-      return this.client.getDeposits();
+      console.log('Calling LN Markets userDepositHistory API');
+      const depositHistory = await this.client.userDepositHistory({});
+      console.log('LN Markets deposit history response:', depositHistory);
+      return depositHistory || [];
     } catch (error) {
       console.error('Error fetching deposit history:', error);
       throw error;
@@ -186,7 +189,18 @@ export class LNMarketsService {
 
   async getDepositStatus(depositId: string): Promise<any> {
     try {
-      return this.client.getDeposit({ id: depositId });
+      console.log('Fetching deposit status for ID:', depositId);
+      // Get all deposits and find the specific one
+      const deposits = await this.getDepositHistory();
+      const deposit = deposits.find(d => d.id === depositId || d.deposit_id === depositId);
+      
+      if (!deposit) {
+        console.log('Deposit not found in history:', depositId);
+        return null;
+      }
+      
+      console.log('Found deposit status:', deposit);
+      return deposit;
     } catch (error) {
       console.error('Error fetching deposit status:', error);
       throw error;

@@ -784,6 +784,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Check specific deposit status from LN Markets
+  app.post("/api/deposits/:depositId/check", async (req, res) => {
+    logRequest(req, "Checking deposit status", { depositId: req.params.depositId });
+    try {
+      const depositId = parseInt(req.params.depositId);
+      const userId = req.body.userId;
+      
+      if (!userId) {
+        logError(req, "Deposit status check failed - no user ID", new Error("Missing userId"));
+        return res.status(400).json({ message: "User ID is required" });
+      }
+
+      // Get the deposit from our database
+      const deposit = await storage.getDeposit(depositId);
+      if (!deposit || deposit.userId !== userId) {
+        logError(req, "Deposit not found", new Error("Deposit not found or access denied"));
+        return res.status(404).json({ message: "Deposit not found" });
+      }
+
+      const user = await storage.getUser(userId);
+      if (!user || !user.apiKey || !user.apiSecret || !user.apiPassphrase) {
+        logError(req, "Deposit status check failed - user credentials missing", new Error("Missing API credentials"));
+        return res.status(400).json({ message: "User API credentials not found" });
+      }
+
+      const lnMarketsService = createLNMarketsService({
+        apiKey: user.apiKey,
+        secret: user.apiSecret,
+        passphrase: user.apiPassphrase,
+        network: "mainnet"
+      });
+
+      // Check status from LN Markets if we have an LN Markets ID
+      if (deposit.lnMarketsId) {
+        logRequest(req, "Fetching deposit status from LN Markets API");
+        const lnMarketsStatus = await lnMarketsService.getDepositStatus(deposit.lnMarketsId);
+        
+        if (lnMarketsStatus) {
+          // Update our database with the latest status
+          const updatedDeposit = await storage.updateDeposit(depositId, {
+            status: lnMarketsStatus.success ? "completed" : "failed",
+            receivedAmount: lnMarketsStatus.received_amount || (lnMarketsStatus.success ? lnMarketsStatus.amount : null),
+            txHash: lnMarketsStatus.payment_hash,
+            confirmations: lnMarketsStatus.success ? 6 : 0,
+          });
+
+          logSuccess(req, "Deposit status updated from LN Markets", { 
+            status: lnMarketsStatus.success ? "completed" : "failed",
+            amount: lnMarketsStatus.amount 
+          });
+          res.json(updatedDeposit);
+        } else {
+          logSuccess(req, "Deposit status retrieved from database (not found in LN Markets)");
+          res.json(deposit);
+        }
+      } else {
+        logSuccess(req, "Deposit status retrieved from database (no LN Markets ID)");
+        res.json(deposit);
+      }
+    } catch (error) {
+      logError(req, "Deposit status check failed", error);
+      res.status(500).json({ message: "Failed to check deposit status" });
+    }
+  });
+
   app.post("/api/deposits/sync", async (req, res) => {
     logRequest(req, "Starting deposit sync from LN Markets");
     try {
@@ -823,23 +888,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (existingDeposit) {
           // Update existing deposit with latest data from LN Markets
           await storage.updateDeposit(existingDeposit.id, {
-            status: lnDeposit.status,
-            receivedAmount: lnDeposit.received_amount,
-            txHash: lnDeposit.tx_hash,
-            confirmations: lnDeposit.confirmations,
+            status: lnDeposit.success ? "completed" : "failed",
+            receivedAmount: lnDeposit.received_amount || (lnDeposit.success ? lnDeposit.amount : null),
+            txHash: lnDeposit.payment_hash,
+            confirmations: lnDeposit.success ? 6 : 0,
           });
           updatedCount++;
         } else {
           // Create new deposit from LN Markets data
+          // Note: LN Markets deposit history doesn't include address field, using payment_hash as identifier
           await storage.createDeposit({
             userId: userId,
             lnMarketsId: lnDeposit.id,
-            address: lnDeposit.address,
+            address: lnDeposit.payment_hash || lnDeposit.address || `lnm_${lnDeposit.id}`, // Use payment hash as address fallback
             amount: lnDeposit.amount,
-            receivedAmount: lnDeposit.received_amount,
-            status: lnDeposit.status,
-            txHash: lnDeposit.tx_hash,
-            confirmations: lnDeposit.confirmations || 0,
+            receivedAmount: lnDeposit.received_amount || (lnDeposit.success ? lnDeposit.amount : null),
+            status: lnDeposit.success ? "completed" : "failed",
+            txHash: lnDeposit.payment_hash,
+            confirmations: lnDeposit.success ? 6 : 0, // Assume confirmed if successful
             expiresAt: lnDeposit.expires_at ? new Date(lnDeposit.expires_at) : null,
           });
           syncedCount++;
