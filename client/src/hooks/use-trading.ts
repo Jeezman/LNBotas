@@ -263,7 +263,6 @@ export function useSyncTrades(userId?: string | number) {
 export function useDeposits(userId?: string | number) {
   return useQuery({
     queryKey: ["/api/deposits", Number(userId)],
-    queryFn: () => apiRequest({ url: `/api/deposits/${userId}` }),
     enabled: !!userId,
   });
 }
@@ -278,11 +277,11 @@ export function useGenerateDeposit(userId?: string | number) {
         throw new Error("User ID is required");
       }
       
-      return apiRequest({
-        url: "/api/deposits/generate",
-        method: "POST",
-        body: { userId: Number(userId), amount },
+      const response = await apiRequest("POST", "/api/deposits/generate", {
+        userId: Number(userId), 
+        amount 
       });
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/deposits", Number(userId)] });
@@ -311,11 +310,10 @@ export function useSyncDeposits(userId?: string | number) {
         throw new Error("User ID is required");
       }
       
-      return apiRequest({
-        url: "/api/deposits/sync",
-        method: "POST",
-        body: { userId: Number(userId) },
+      const response = await apiRequest("POST", "/api/deposits/sync", {
+        userId: Number(userId)
       });
+      return response.json();
     },
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/deposits", Number(userId)] });
