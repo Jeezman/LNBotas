@@ -4,15 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Copy, QrCode } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import QRCode from "react-qr-code";
-
-interface Deposit {
-  id: number;
-  address: string;
-  amount: number;
-  status: string;
-  expiresAt: string;
-  expiry: number;
-}
+import type { Deposit } from "@shared/schema";
 
 interface DepositModalProps {
   isOpen: boolean;
@@ -33,11 +25,13 @@ export function DepositModal({ isOpen, onClose, deposit }: DepositModalProps) {
     });
   };
 
-  const formatAmount = (amount: number) => {
+  const formatAmount = (amount: number | null) => {
+    if (!amount) return "0";
     return amount.toLocaleString();
   };
 
-  const formatExpiry = (expiresAt: string) => {
+  const formatExpiry = (expiresAt: Date | null) => {
+    if (!expiresAt) return "No expiry";
     const expiry = new Date(expiresAt);
     const now = new Date();
     const diffMs = expiry.getTime() - now.getTime();

@@ -37,7 +37,7 @@ export default function UserPage() {
   const checkDepositStatus = useCheckDepositStatus();
   const { toast } = useToast();
   
-  const [selectedDeposit, setSelectedDeposit] = useState<any>(null);
+  const [selectedDeposit, setSelectedDeposit] = useState<Deposit | null>(null);
   const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
   
   const depositForm = useForm<DepositFormValues>({
@@ -66,7 +66,7 @@ export default function UserPage() {
     });
   };
 
-  const handleShowQrCode = (deposit: any) => {
+  const handleShowQrCode = (deposit: Deposit) => {
     setSelectedDeposit(deposit);
     setIsDepositModalOpen(true);
   };
