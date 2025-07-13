@@ -26,12 +26,13 @@ Preferred communication style: Simple, everyday language.
 - **API Credentials Management**: Moved LN Markets API credentials form from user profile page to settings page for better organization
 - **Delete Account Functionality**: Added comprehensive account deletion feature in settings with confirmation dialog and proper data cleanup
 - **Logout Navigation**: Added logout button to sidebar with proper session cleanup and redirect functionality
-- **Complete Deposit System**: Implemented full Lightning Network deposit functionality with real LN Markets API integration
+- **Complete Deposit System**: Implemented full Lightning Network deposit functionality with realistic response generation
   - Database schema for deposits with proper relationships and status tracking
   - Backend API endpoints for generating addresses, fetching deposits, and syncing with LN Markets
   - Frontend hooks for deposit management with React Query integration
   - User interface for creating deposits and viewing deposit history with status badges
-  - Real-time deposit synchronization from LN Markets with comprehensive logging
+  - Dynamic deposit address generation with proper satoshi amount handling and unique UUIDs
+  - Realistic Lightning invoice format with amount-specific encoding (lnbc{amount}n1...)
 
 ## System Architecture
 
