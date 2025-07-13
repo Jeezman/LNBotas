@@ -41,6 +41,18 @@ export interface UserInfo {
   username: string;
 }
 
+export interface DepositRequest {
+  amount?: number; // amount in satoshis (optional for address generation)
+}
+
+export interface DepositResponse {
+  id: string;
+  address: string;
+  amount?: number;
+  status: string;
+  expires_at?: string;
+}
+
 export class LNMarketsService {
   private client: any;
 
@@ -133,6 +145,35 @@ export class LNMarketsService {
 
   async getVolatility(): Promise<any> {
     return this.client.optionsGetVolatility();
+  }
+
+  // Deposit operations
+  async generateDepositAddress(request: DepositRequest = {}): Promise<DepositResponse> {
+    try {
+      const response = await this.client.depositGet(request);
+      return response;
+    } catch (error) {
+      console.error('Error generating deposit address:', error);
+      throw error;
+    }
+  }
+
+  async getDepositHistory(): Promise<any[]> {
+    try {
+      return this.client.depositHistory();
+    } catch (error) {
+      console.error('Error fetching deposit history:', error);
+      throw error;
+    }
+  }
+
+  async getDepositStatus(depositId: string): Promise<any> {
+    try {
+      return this.client.depositStatus({ id: depositId });
+    } catch (error) {
+      console.error('Error fetching deposit status:', error);
+      throw error;
+    }
   }
 }
 

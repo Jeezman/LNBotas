@@ -1,4 +1,4 @@
-import { users, trades, marketData, type User, type InsertUser, type Trade, type InsertTrade, type MarketData, type InsertMarketData } from "@shared/schema";
+import { users, trades, marketData, deposits, type User, type InsertUser, type Trade, type InsertTrade, type MarketData, type InsertMarketData, type Deposit, type InsertDeposit } from "@shared/schema";
 import { db } from "./db";
 import { eq, and } from "drizzle-orm";
 
@@ -21,23 +21,35 @@ export interface IStorage {
   // Market data operations
   getMarketData(symbol: string): Promise<MarketData | undefined>;
   updateMarketData(data: InsertMarketData): Promise<MarketData>;
+
+  // Deposit operations
+  getDeposit(id: number): Promise<Deposit | undefined>;
+  getDepositsByUserId(userId: number): Promise<Deposit[]>;
+  getDepositByAddress(address: string): Promise<Deposit | undefined>;
+  createDeposit(deposit: InsertDeposit): Promise<Deposit>;
+  updateDeposit(id: number, updates: Partial<Deposit>): Promise<Deposit | undefined>;
+  deleteDeposit(id: number): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
   private users: Map<number, User>;
   private trades: Map<number, Trade>;
   private marketData: Map<string, MarketData>;
+  private deposits: Map<number, Deposit>;
   private currentUserId: number;
   private currentTradeId: number;
   private currentMarketDataId: number;
+  private currentDepositId: number;
 
   constructor() {
     this.users = new Map();
     this.trades = new Map();
     this.marketData = new Map();
+    this.deposits = new Map();
     this.currentUserId = 1;
     this.currentTradeId = 1;
     this.currentMarketDataId = 1;
+    this.currentDepositId = 1;
     
     // Create demo user and sample data
     this.createDemoUser();
@@ -207,6 +219,60 @@ export class MemStorage implements IStorage {
     this.marketData.set(data.symbol, marketData);
     return marketData;
   }
+
+  // Deposit operations
+  async getDeposit(id: number): Promise<Deposit | undefined> {
+    return this.deposits.get(id);
+  }
+
+  async getDepositsByUserId(userId: number): Promise<Deposit[]> {
+    return Array.from(this.deposits.values()).filter(
+      (deposit) => deposit.userId === userId,
+    );
+  }
+
+  async getDepositByAddress(address: string): Promise<Deposit | undefined> {
+    return Array.from(this.deposits.values()).find(
+      (deposit) => deposit.address === address,
+    );
+  }
+
+  async createDeposit(insertDeposit: InsertDeposit): Promise<Deposit> {
+    const id = this.currentDepositId++;
+    const deposit: Deposit = {
+      id,
+      userId: insertDeposit.userId,
+      lnMarketsId: insertDeposit.lnMarketsId || null,
+      address: insertDeposit.address,
+      amount: insertDeposit.amount || null,
+      receivedAmount: insertDeposit.receivedAmount || null,
+      status: insertDeposit.status,
+      txHash: insertDeposit.txHash || null,
+      confirmations: 0,
+      expiresAt: insertDeposit.expiresAt || null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.deposits.set(id, deposit);
+    return deposit;
+  }
+
+  async updateDeposit(id: number, updates: Partial<Deposit>): Promise<Deposit | undefined> {
+    const deposit = this.deposits.get(id);
+    if (!deposit) return undefined;
+    
+    const updatedDeposit = { 
+      ...deposit, 
+      ...updates, 
+      updatedAt: new Date() 
+    };
+    this.deposits.set(id, updatedDeposit);
+    return updatedDeposit;
+  }
+
+  async deleteDeposit(id: number): Promise<boolean> {
+    return this.deposits.delete(id);
+  }
 }
 
 export class DatabaseStorage implements IStorage {
@@ -308,6 +374,50 @@ export class DatabaseStorage implements IStorage {
         .returning();
       return inserted;
     }
+  }
+
+  // Deposit operations
+  async getDeposit(id: number): Promise<Deposit | undefined> {
+    const [deposit] = await db.select().from(deposits).where(eq(deposits.id, id));
+    return deposit || undefined;
+  }
+
+  async getDepositsByUserId(userId: number): Promise<Deposit[]> {
+    return db.select().from(deposits).where(eq(deposits.userId, userId));
+  }
+
+  async getDepositByAddress(address: string): Promise<Deposit | undefined> {
+    const [deposit] = await db.select().from(deposits).where(eq(deposits.address, address));
+    return deposit || undefined;
+  }
+
+  async createDeposit(insertDeposit: InsertDeposit): Promise<Deposit> {
+    const [deposit] = await db
+      .insert(deposits)
+      .values({
+        ...insertDeposit,
+        status: insertDeposit.status || 'pending',
+        confirmations: 0,
+      })
+      .returning();
+    return deposit;
+  }
+
+  async updateDeposit(id: number, updates: Partial<Deposit>): Promise<Deposit | undefined> {
+    const [deposit] = await db
+      .update(deposits)
+      .set({
+        ...updates,
+        updatedAt: new Date(),
+      })
+      .where(eq(deposits.id, id))
+      .returning();
+    return deposit || undefined;
+  }
+
+  async deleteDeposit(id: number): Promise<boolean> {
+    const result = await db.delete(deposits).where(eq(deposits.id, id));
+    return (result.rowCount || 0) > 0;
   }
 }
 

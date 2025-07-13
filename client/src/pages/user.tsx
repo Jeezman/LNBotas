@@ -1,4 +1,5 @@
-import { useUser } from "@/hooks/use-trading";
+import { useUser, useDeposits, useGenerateDeposit, useSyncDeposits } from "@/hooks/use-trading";
+import { useAuth } from "@/hooks/use-auth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -26,10 +27,12 @@ const depositFormSchema = z.object({
 type DepositFormValues = z.infer<typeof depositFormSchema>;
 
 export default function UserPage() {
-  const { data: user, isLoading } = useUser();
+  const { user: authUser } = useAuth();
+  const { data: user, isLoading } = useUser(authUser?.id);
+  const { data: deposits = [], refetch: refetchDeposits } = useDeposits(authUser?.id);
+  const generateDeposit = useGenerateDeposit(authUser?.id);
+  const syncDeposits = useSyncDeposits(authUser?.id);
   const { toast } = useToast();
-  const [depositAddress, setDepositAddress] = useState<string | null>(null);
-  const [isGeneratingAddress, setIsGeneratingAddress] = useState(false);
   
   const depositForm = useForm<DepositFormValues>({
     resolver: zodResolver(depositFormSchema),
@@ -38,51 +41,21 @@ export default function UserPage() {
     },
   });
 
-  const handleGenerateDepositAddress = async () => {
-    if (!user) return;
-    
-    setIsGeneratingAddress(true);
-    try {
-      // This would typically call LN Markets API to generate a new deposit address
-      // For now, we'll simulate this with a placeholder address
-      const mockAddress = `ln${Math.random().toString(36).substring(2, 15)}${Math.random().toString(36).substring(2, 15)}`;
-      setDepositAddress(mockAddress);
-      
-      toast({
-        title: "Deposit Address Generated",
-        description: "New Bitcoin Lightning deposit address created successfully.",
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to generate deposit address. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsGeneratingAddress(false);
-    }
+  const onSubmitDeposit = async (values: DepositFormValues) => {
+    const amount = Math.floor(parseFloat(values.amount) * 100000000); // Convert to satoshis
+    generateDeposit.mutate({ amount });
   };
 
-  const handleCopyAddress = () => {
-    if (depositAddress) {
-      navigator.clipboard.writeText(depositAddress);
-      toast({
-        title: "Copied",
-        description: "Deposit address copied to clipboard.",
-      });
-    }
-  };
-
-  const onSubmitDeposit = (values: DepositFormValues) => {
+  const handleCopyAddress = (address: string) => {
+    navigator.clipboard.writeText(address);
     toast({
-      title: "Deposit Initiated",
-      description: `Deposit request for ${values.amount} sats has been created. Use the address below to complete the transfer.`,
+      title: "Copied",
+      description: "Deposit address copied to clipboard.",
     });
-    
-    // Generate address when deposit is initiated
-    if (!depositAddress) {
-      handleGenerateDepositAddress();
-    }
+  };
+
+  const handleSyncDeposits = () => {
+    syncDeposits.mutate();
   };
 
   if (isLoading) {
@@ -180,89 +153,94 @@ export default function UserPage() {
                   name="amount"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Amount (Satoshis)</FormLabel>
+                      <FormLabel>Amount (BTC)</FormLabel>
                       <FormControl>
                         <Input 
-                          placeholder="10000" 
+                          placeholder="0.00100000" 
                           type="number"
-                          min="1"
+                          step="0.00000001"
+                          min="0.00000001"
                           {...field} 
                         />
                       </FormControl>
                       <FormDescription>
-                        Enter the amount in satoshis you want to deposit
+                        Enter the amount in BTC you want to deposit
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
                 
-                <Button type="submit" className="w-full">
+                <Button 
+                  type="submit" 
+                  className="w-full"
+                  disabled={generateDeposit.isPending}
+                >
+                  {generateDeposit.isPending ? (
+                    <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Download className="mr-2 h-4 w-4" />
+                  )}
                   Generate Deposit Address
                 </Button>
               </form>
             </Form>
 
-            {depositAddress && (
+            {deposits.length > 0 && (
               <>
                 <Separator />
                 
                 <div className="space-y-4">
-                  <div className="text-center">
-                    <div className="mx-auto w-32 h-32 bg-white border-2 border-gray-300 rounded-lg flex items-center justify-center mb-4">
-                      <QrCode className="h-16 w-16 text-gray-400" />
-                    </div>
-                    <p className="text-sm text-muted-foreground mb-2">
-                      Lightning Network Deposit Address
-                    </p>
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm font-medium">Recent Deposits</Label>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleSyncDeposits}
+                      disabled={syncDeposits.isPending}
+                    >
+                      {syncDeposits.isPending ? (
+                        <RefreshCw className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <RefreshCw className="h-4 w-4" />
+                      )}
+                    </Button>
                   </div>
                   
-                  <div className="space-y-2">
-                    <Label>Deposit Address</Label>
-                    <div className="flex gap-2">
-                      <Input 
-                        value={depositAddress} 
-                        readOnly 
-                        className="font-mono text-xs"
-                      />
-                      <Button 
-                        variant="outline" 
-                        size="icon"
-                        onClick={handleCopyAddress}
-                      >
-                        <Copy className="h-4 w-4" />
-                      </Button>
+                  {deposits.slice(0, 3).map((deposit: any) => (
+                    <div key={deposit.id} className="p-4 border rounded-lg bg-muted/50">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <Badge variant={
+                            deposit.status === 'confirmed' ? 'default' :
+                            deposit.status === 'pending' ? 'secondary' : 'destructive'
+                          }>
+                            {deposit.status}
+                          </Badge>
+                          {deposit.amount && (
+                            <span className="text-sm text-muted-foreground">
+                              {(deposit.amount / 100000000).toFixed(8)} BTC
+                            </span>
+                          )}
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleCopyAddress(deposit.address)}
+                        >
+                          <Copy className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <div className="bg-background p-3 rounded border font-mono text-xs break-all">
+                        {deposit.address}
+                      </div>
+                      {deposit.expiresAt && new Date(deposit.expiresAt) > new Date() && (
+                        <p className="text-xs text-muted-foreground mt-2">
+                          Expires: {new Date(deposit.expiresAt).toLocaleString()}
+                        </p>
+                      )}
                     </div>
-                  </div>
-
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <h4 className="font-medium text-blue-900 mb-2">Deposit Instructions</h4>
-                    <ul className="text-sm text-blue-800 space-y-1">
-                      <li>• Send Bitcoin to the address above</li>
-                      <li>• Minimum deposit: 1,000 sats</li>
-                      <li>• Funds will appear after 1 confirmation</li>
-                      <li>• Lightning Network deposits are instant</li>
-                    </ul>
-                  </div>
-
-                  <Button 
-                    variant="outline" 
-                    onClick={handleGenerateDepositAddress}
-                    disabled={isGeneratingAddress}
-                    className="w-full"
-                  >
-                    {isGeneratingAddress ? (
-                      <>
-                        <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                        Generating...
-                      </>
-                    ) : (
-                      <>
-                        <RefreshCw className="mr-2 h-4 w-4" />
-                        Generate New Address
-                      </>
-                    )}
-                  </Button>
+                  ))}
                 </div>
               </>
             )}

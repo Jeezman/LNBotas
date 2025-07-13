@@ -258,3 +258,78 @@ export function useSyncTrades(userId?: string | number) {
     },
   });
 }
+
+// Deposit hooks
+export function useDeposits(userId?: string | number) {
+  return useQuery({
+    queryKey: ["/api/deposits", Number(userId)],
+    queryFn: () => apiRequest({ url: `/api/deposits/${userId}` }),
+    enabled: !!userId,
+  });
+}
+
+export function useGenerateDeposit(userId?: string | number) {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async ({ amount }: { amount?: number }) => {
+      if (!userId) {
+        throw new Error("User ID is required");
+      }
+      
+      return apiRequest({
+        url: "/api/deposits/generate",
+        method: "POST",
+        body: { userId: Number(userId), amount },
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/deposits", Number(userId)] });
+      toast({
+        title: "Deposit Address Generated",
+        description: "Your Lightning deposit address has been created successfully.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Generation Failed",
+        description: error.message || "Failed to generate deposit address",
+        variant: "destructive",
+      });
+    },
+  });
+}
+
+export function useSyncDeposits(userId?: string | number) {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async () => {
+      if (!userId) {
+        throw new Error("User ID is required");
+      }
+      
+      return apiRequest({
+        url: "/api/deposits/sync",
+        method: "POST",
+        body: { userId: Number(userId) },
+      });
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/deposits", Number(userId)] });
+      toast({
+        title: "Deposits Synced",
+        description: `Synced ${data.totalProcessed} deposits from LN Markets (${data.syncedCount} new, ${data.updatedCount} updated)`,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Sync Failed",
+        description: error.message || "Failed to sync deposits from LN Markets",
+        variant: "destructive",
+      });
+    },
+  });
+}

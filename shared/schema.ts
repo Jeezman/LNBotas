@@ -55,6 +55,21 @@ export const marketData = pgTable("market_data", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+export const deposits = pgTable("deposits", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  lnMarketsId: text("ln_markets_id"), // LN Markets deposit ID
+  address: text("address").notNull(), // Lightning Network address
+  amount: integer("amount"), // requested amount in satoshis
+  receivedAmount: integer("received_amount"), // actual received amount in satoshis
+  status: text("status").notNull(), // 'pending' | 'confirmed' | 'failed' | 'expired'
+  txHash: text("tx_hash"), // transaction hash if applicable
+  confirmations: integer("confirmations").default(0),
+  expiresAt: timestamp("expires_at"), // when the address expires
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
   password: true,
@@ -74,9 +89,17 @@ export const insertMarketDataSchema = createInsertSchema(marketData).omit({
   updatedAt: true,
 });
 
+export const insertDepositSchema = createInsertSchema(deposits).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 export type InsertTrade = z.infer<typeof insertTradeSchema>;
 export type Trade = typeof trades.$inferSelect;
 export type InsertMarketData = z.infer<typeof insertMarketDataSchema>;
 export type MarketData = typeof marketData.$inferSelect;
+export type InsertDeposit = z.infer<typeof insertDepositSchema>;
+export type Deposit = typeof deposits.$inferSelect;

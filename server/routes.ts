@@ -1,7 +1,7 @@
 import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertTradeSchema } from "@shared/schema";
+import { insertTradeSchema, insertDepositSchema } from "@shared/schema";
 import { createLNMarketsService } from "./services/lnmarkets";
 import { z } from "zod";
 import bcrypt from "bcrypt";
@@ -706,6 +706,153 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res
         .status(500)
         .json({ message: "Failed to sync trades from LN Markets" });
+    }
+  });
+
+  // Deposit endpoints
+  app.post("/api/deposits/generate", async (req, res) => {
+    logRequest(req, "Generating deposit address", { userId: req.body.userId, amount: req.body.amount });
+    try {
+      const { userId, amount } = req.body;
+      
+      if (!userId) {
+        logError(req, "Deposit generation failed - no user ID", new Error("Missing userId"));
+        return res.status(400).json({ message: "User ID is required" });
+      }
+
+      const user = await storage.getUser(userId);
+      if (!user || !user.apiKey || !user.apiSecret || !user.apiPassphrase) {
+        logError(req, "Deposit generation failed - user credentials not found", new Error("Missing API credentials"));
+        return res.status(400).json({ message: "User API credentials not found" });
+      }
+
+      const lnMarketsService = createLNMarketsService({
+        apiKey: user.apiKey,
+        secret: user.apiSecret,
+        passphrase: user.apiPassphrase,
+        network: "mainnet"
+      });
+
+      // Generate deposit address via LN Markets API
+      logRequest(req, "Calling LN Markets API to generate deposit address");
+      const depositResponse = await lnMarketsService.generateDepositAddress({ amount });
+      
+      // Store deposit in database
+      const deposit = await storage.createDeposit({
+        userId,
+        lnMarketsId: depositResponse.id,
+        address: depositResponse.address,
+        amount: amount || null,
+        status: 'pending',
+        expiresAt: depositResponse.expires_at ? new Date(depositResponse.expires_at) : null,
+      });
+
+      logSuccess(req, "Deposit address generated successfully", { 
+        depositId: deposit.id, 
+        address: depositResponse.address,
+        amount
+      });
+      
+      res.json({
+        id: deposit.id,
+        address: depositResponse.address,
+        amount: amount,
+        status: deposit.status,
+        expiresAt: deposit.expiresAt,
+      });
+    } catch (error) {
+      logError(req, "Deposit address generation failed", error);
+      res.status(500).json({ message: "Failed to generate deposit address" });
+    }
+  });
+
+  app.get("/api/deposits/:userId", async (req, res) => {
+    logRequest(req, "Fetching user deposits", { userId: req.params.userId });
+    try {
+      const userId = parseInt(req.params.userId);
+      const deposits = await storage.getDepositsByUserId(userId);
+      logSuccess(req, "User deposits retrieved", { count: deposits.length });
+      res.json(deposits);
+    } catch (error) {
+      logError(req, "Failed to fetch user deposits", error);
+      res.status(500).json({ message: "Failed to fetch deposits" });
+    }
+  });
+
+  app.post("/api/deposits/sync", async (req, res) => {
+    logRequest(req, "Starting deposit sync from LN Markets");
+    try {
+      const { userId } = req.body;
+      
+      if (!userId) {
+        logError(req, "Deposit sync failed - no user ID", new Error("Missing userId"));
+        return res.status(400).json({ message: "User ID is required" });
+      }
+
+      const user = await storage.getUser(userId);
+      if (!user || !user.apiKey || !user.apiSecret || !user.apiPassphrase) {
+        logError(req, "Deposit sync failed - user credentials missing", new Error("Missing API credentials"));
+        return res.status(400).json({ message: "User API credentials not found" });
+      }
+
+      const lnMarketsService = createLNMarketsService({
+        apiKey: user.apiKey,
+        secret: user.apiSecret,
+        passphrase: user.apiPassphrase,
+        network: "mainnet"
+      });
+
+      // Fetch deposit history from LN Markets
+      logRequest(req, "Fetching deposit history from LN Markets API");
+      const depositHistory = await lnMarketsService.getDepositHistory();
+      let syncedCount = 0;
+      let updatedCount = 0;
+
+      logRequest(req, "Processing deposit history", { depositsFound: depositHistory.length });
+      
+      for (const lnDeposit of depositHistory) {
+        // Check if deposit already exists in our database
+        const existingDeposits = await storage.getDepositsByUserId(userId);
+        const existingDeposit = existingDeposits.find(d => d.lnMarketsId === lnDeposit.id);
+
+        if (existingDeposit) {
+          // Update existing deposit with latest data from LN Markets
+          await storage.updateDeposit(existingDeposit.id, {
+            status: lnDeposit.status,
+            receivedAmount: lnDeposit.received_amount,
+            txHash: lnDeposit.tx_hash,
+            confirmations: lnDeposit.confirmations,
+          });
+          updatedCount++;
+        } else {
+          // Create new deposit from LN Markets data
+          await storage.createDeposit({
+            userId: userId,
+            lnMarketsId: lnDeposit.id,
+            address: lnDeposit.address,
+            amount: lnDeposit.amount,
+            receivedAmount: lnDeposit.received_amount,
+            status: lnDeposit.status,
+            txHash: lnDeposit.tx_hash,
+            confirmations: lnDeposit.confirmations || 0,
+            expiresAt: lnDeposit.expires_at ? new Date(lnDeposit.expires_at) : null,
+          });
+          syncedCount++;
+        }
+      }
+
+      const result = {
+        message: "Deposits synced successfully",
+        syncedCount,
+        updatedCount,
+        totalProcessed: syncedCount + updatedCount
+      };
+      
+      logSuccess(req, "Deposit sync completed successfully", result);
+      res.json(result);
+    } catch (error) {
+      logError(req, "Deposit sync failed", error);
+      res.status(500).json({ message: "Failed to sync deposits from LN Markets" });
     }
   });
 
