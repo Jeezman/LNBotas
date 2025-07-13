@@ -236,10 +236,8 @@ export function useSyncTrades(userId?: string | number) {
     mutationFn: async () => {
       if (!userIdParam) throw new Error("User ID is required");
       
-      return apiRequest(`/api/trades/sync`, {
-        method: "POST",
-        body: JSON.stringify({ userId: userIdParam }),
-      });
+      const response = await apiRequest("POST", "/api/trades/sync", { userId: userIdParam });
+      return response.json();
     },
     onSuccess: (data: any) => {
       // Invalidate all trade-related queries to refresh the data
