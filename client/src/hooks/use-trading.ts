@@ -6,6 +6,7 @@ import {
   type User,
   type TradeRequest,
 } from "@/lib/api";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 
