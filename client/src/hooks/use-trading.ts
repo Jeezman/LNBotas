@@ -6,6 +6,7 @@ import {
   type User,
   type TradeRequest,
 } from "@/lib/api";
+import type { Deposit } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
@@ -261,7 +262,7 @@ export function useSyncTrades(userId?: string | number) {
 
 // Deposit hooks
 export function useDeposits(userId?: string | number) {
-  return useQuery({
+  return useQuery<Deposit[]>({
     queryKey: ["/api/deposits", Number(userId)],
     enabled: !!userId,
   });

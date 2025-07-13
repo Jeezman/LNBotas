@@ -1,5 +1,6 @@
 import { useUser, useDeposits, useGenerateDeposit, useSyncDeposits, useCheckDepositStatus } from "@/hooks/use-trading";
 import { useAuth } from "@/hooks/use-auth";
+import type { Deposit } from "@shared/schema";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -13,6 +14,7 @@ import { z } from "zod";
 import { useState } from "react";
 import { User, Bitcoin, DollarSign, Copy, QrCode, Download, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { DepositModal } from "@/components/deposit-modal";
 
 const depositFormSchema = z.object({
   amount: z.string().min(1, "Amount is required").refine(
@@ -35,6 +37,9 @@ export default function UserPage() {
   const checkDepositStatus = useCheckDepositStatus();
   const { toast } = useToast();
   
+  const [selectedDeposit, setSelectedDeposit] = useState<any>(null);
+  const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
+  
   const depositForm = useForm<DepositFormValues>({
     resolver: zodResolver(depositFormSchema),
     defaultValues: {
@@ -44,7 +49,13 @@ export default function UserPage() {
 
   const onSubmitDeposit = async (values: DepositFormValues) => {
     const amount = parseInt(values.amount); // Amount is already in satoshis
-    generateDeposit.mutate({ amount });
+    generateDeposit.mutate({ amount }, {
+      onSuccess: (newDeposit) => {
+        setSelectedDeposit(newDeposit);
+        setIsDepositModalOpen(true);
+        depositForm.reset();
+      }
+    });
   };
 
   const handleCopyAddress = (address: string) => {
@@ -53,6 +64,16 @@ export default function UserPage() {
       title: "Copied",
       description: "Deposit address copied to clipboard.",
     });
+  };
+
+  const handleShowQrCode = (deposit: any) => {
+    setSelectedDeposit(deposit);
+    setIsDepositModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsDepositModalOpen(false);
+    setSelectedDeposit(null);
   };
 
   const handleSyncDeposits = () => {
@@ -213,7 +234,7 @@ export default function UserPage() {
                     </Button>
                   </div>
                   
-                  {deposits.slice(0, 3).map((deposit: any) => (
+                  {deposits.slice(0, 3).map((deposit: Deposit) => (
                     <div key={deposit.id} className="p-4 border rounded-lg bg-muted/50">
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
@@ -237,6 +258,14 @@ export default function UserPage() {
                           )}
                         </div>
                         <div className="flex gap-2">
+                          <Button
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => handleShowQrCode(deposit)}
+                            title="Show QR code"
+                          >
+                            <QrCode className="h-4 w-4" />
+                          </Button>
                           <Button
                             variant="ghost" 
                             size="sm"
@@ -276,6 +305,13 @@ export default function UserPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Deposit Modal */}
+      <DepositModal
+        isOpen={isDepositModalOpen}
+        onClose={handleCloseModal}
+        deposit={selectedDeposit}
+      />
     </div>
   );
 }
