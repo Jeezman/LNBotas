@@ -1,15 +1,15 @@
-import { createRestClient } from "@ln-markets/api";
+import { createRestClient } from '@ln-markets/api';
 
 export interface LNMarketsConfig {
   apiKey: string;
   secret: string;
   passphrase: string;
-  network?: "mainnet" | "testnet";
+  network?: 'mainnet' | 'testnet';
 }
 
 export interface FuturesTradeRequest {
-  type: "l" | "m"; // limit or market
-  side: "b" | "s"; // buy or sell
+  type: 'l' | 'm'; // limit or market
+  side: 'b' | 's'; // buy or sell
   margin: number; // in satoshis
   leverage: number;
   quantity?: number;
@@ -19,9 +19,9 @@ export interface FuturesTradeRequest {
 }
 
 export interface OptionsTradeRequest {
-  side: "b"; // buy only for options
+  side: 'b'; // buy only for options
   quantity: number;
-  settlement: "physical" | "cash";
+  settlement: 'physical' | 'cash';
   instrument_name: string;
 }
 
@@ -53,15 +53,13 @@ export interface DepositResponse {
 
 export class LNMarketsService {
   private client: any;
-  private config: LNMarketsConfig;
 
   constructor(config: LNMarketsConfig) {
-    this.config = config;
     this.client = createRestClient({
       key: config.apiKey,
       secret: config.secret,
       passphrase: config.passphrase,
-      network: config.network || "mainnet",
+      network: config.network || 'mainnet',
     });
   }
 
@@ -81,14 +79,14 @@ export class LNMarketsService {
   }
 
   async getFuturesTrades(
-    type: "open" | "closed" | "pending" = "open",
+    type: 'open' | 'closed' | 'pending' = 'open'
   ): Promise<any[]> {
     return this.client.futuresGetTrades({ type });
   }
 
   async updateFuturesTrade(
     id: string,
-    updates: { takeprofit?: number; stoploss?: number },
+    updates: { takeprofit?: number; stoploss?: number }
   ): Promise<any> {
     return this.client.futuresUpdateTrade({ id, ...updates });
   }
@@ -147,29 +145,41 @@ export class LNMarketsService {
   }
 
   // Deposit operations
-  async generateDepositAddress(request: DepositRequest = {}): Promise<DepositResponse> {
+  async generateDepositAddress(
+    request: DepositRequest = {}
+  ): Promise<DepositResponse> {
     try {
-      console.log('Calling LN Markets userDeposit API with amount:', request.amount);
-      
+      console.log(
+        'Calling LN Markets userDeposit API with amount:',
+        request.amount
+      );
+
       // Call the actual LN Markets userDeposit function
       const depositResponse = await this.client.userDeposit({
-        amount: request.amount || 100000 // Default to 100k satoshis if not specified
+        amount: request.amount || 100000, // Default to 100k satoshis if not specified
       });
-      
+
       console.log('LN Markets deposit response:', depositResponse);
-      
+
       const crypto = await import('crypto');
-      
+
       // Map the LN Markets response to our expected format
       const response: DepositResponse = {
-        depositId: depositResponse.id || depositResponse.depositId || crypto.randomUUID(),
-        paymentRequest: depositResponse.payment_request || depositResponse.paymentRequest,
-        expiry: depositResponse.expiry || 90
+        depositId:
+          depositResponse.id ||
+          depositResponse.depositId ||
+          crypto.randomUUID(),
+        paymentRequest:
+          depositResponse.payment_request || depositResponse.paymentRequest,
+        expiry: depositResponse.expiry || 90,
       };
-      
+
       return response;
     } catch (error) {
-      console.error('Error generating deposit address via LN Markets API:', error);
+      console.error(
+        'Error generating deposit address via LN Markets API:',
+        error
+      );
       throw error;
     }
   }
@@ -191,13 +201,15 @@ export class LNMarketsService {
       console.log('Fetching deposit status for ID:', depositId);
       // Get all deposits and find the specific one
       const deposits = await this.getDepositHistory();
-      const deposit = deposits.find(d => d.id === depositId || d.deposit_id === depositId);
-      
+      const deposit = deposits.find(
+        (d) => d.id === depositId || d.deposit_id === depositId
+      );
+
       if (!deposit) {
         console.log('Deposit not found in history:', depositId);
         return null;
       }
-      
+
       console.log('Found deposit status:', deposit);
       return deposit;
     } catch (error) {
@@ -208,7 +220,7 @@ export class LNMarketsService {
 }
 
 export function createLNMarketsService(
-  config: LNMarketsConfig,
+  config: LNMarketsConfig
 ): LNMarketsService {
   return new LNMarketsService(config);
 }

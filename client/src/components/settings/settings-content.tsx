@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertTriangle, Trash2, Key } from "lucide-react";
+import { AlertTriangle, Trash2, Key, Database } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -36,6 +36,7 @@ type CredentialsFormValues = z.infer<typeof credentialsSchema>;
 export function SettingsContent() {
   const [confirmText, setConfirmText] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isClearingCache, setIsClearingCache] = useState(false);
   const { user, logout } = useAuth();
   const { toast } = useToast();
 
@@ -86,6 +87,28 @@ export function SettingsContent() {
         });
       },
     });
+  };
+
+  const handleClearCache = async () => {
+    setIsClearingCache(true);
+    try {
+      const response = await apiRequest("DELETE", "/api/market/cache", {});
+      const result = await response.json();
+      
+      toast({
+        title: "Cache Cleared",
+        description: result.message || "Market data cache has been cleared successfully",
+      });
+    } catch (error: any) {
+      console.error('Clear cache error:', error);
+      toast({
+        title: "Clear Cache Failed",
+        description: error.message || "Failed to clear market data cache",
+        variant: "destructive",
+      });
+    } finally {
+      setIsClearingCache(false);
+    }
   };
 
   const handleDeleteAccount = async () => {
@@ -327,6 +350,38 @@ export function SettingsContent() {
                 API credentials with anyone else. The app will test your credentials when you save them.
               </p>
             </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Market Data Management */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Database className="h-5 w-5" />
+            Market Data Management
+          </CardTitle>
+          <CardDescription>
+            Manage cached market data and system cache
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+            <h4 className="font-medium text-blue-800 dark:text-blue-200 mb-2">
+              Clear Market Data Cache
+            </h4>
+            <p className="text-sm text-blue-700 dark:text-blue-300 mb-3">
+              This will clear all cached market data from the database. The system will either fetch fresh data from the LN Markets API (if credentials are available) or return empty values.
+            </p>
+            <Button 
+              onClick={handleClearCache}
+              disabled={isClearingCache}
+              variant="outline"
+              className="w-full sm:w-auto"
+            >
+              <Database className="w-4 h-4 mr-2" />
+              {isClearingCache ? "Clearing..." : "Clear Market Data Cache"}
+            </Button>
           </div>
         </CardContent>
       </Card>

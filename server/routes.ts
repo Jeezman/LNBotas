@@ -108,15 +108,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       // Fetch market data from LN Markets API
-      let marketTicker: any, futuresMarket: any = null;
+      let marketTicker: any,
+        futuresMarket: any = null;
 
       try {
         logRequest(req, 'Calling LN Markets getFuturesTicker API');
         marketTicker = await lnMarketsService.getFuturesTicker();
-        logSuccess(req, 'LN Markets ticker data received', {
-          last: marketTicker.last,
-          volume: marketTicker.volume,
-        });
+        logRequest(req, 'LN Markets ticker data received', { marketTicker });
       } catch (tickerError) {
         logError(req, 'Failed to fetch ticker data', tickerError);
         throw tickerError;
@@ -124,15 +122,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Note: getFuturesMarket() method is not available in LN Markets API
       // We'll use ticker data only for now
-      logRequest(req, 'Using ticker data only (getFuturesMarket not available)');
+      logRequest(
+        req,
+        'Using ticker data only (getFuturesMarket not available)'
+      );
       futuresMarket = null;
 
       // Calculate volume in USD (volume in BTC * last price)
       const lastPrice = parseFloat(marketTicker.last);
       const volume24h = parseFloat(marketTicker.volume);
-      const volumeUSD = (!isNaN(lastPrice) && !isNaN(volume24h)) 
-        ? (volume24h * lastPrice).toString() 
-        : "0.00";
+      const volumeUSD =
+        !isNaN(lastPrice) && !isNaN(volume24h)
+          ? (volume24h * lastPrice).toString()
+          : '0.00';
 
       // Map LN Markets data to our schema
       const marketDataUpdate = {
@@ -172,6 +174,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       res.status(500).json({ message: 'Failed to update market data' });
+    }
+  });
+
+  // Clear market data cache
+  app.delete('/api/market/cache', async (req, res) => {
+    logRequest(req, 'Clearing market data cache');
+    try {
+      const { symbol } = req.query;
+      const symbolToClose = symbol as string | undefined;
+      
+      const success = await storage.clearMarketData(symbolToClose);
+      
+      if (success) {
+        const message = symbolToClose 
+          ? `Market data cache cleared for ${symbolToClose}`
+          : 'All market data cache cleared';
+        logSuccess(req, message);
+        res.json({ 
+          message,
+          cleared: symbolToClose || 'all'
+        });
+      } else {
+        logRequest(req, 'No market data found to clear');
+        res.json({ 
+          message: 'No market data found to clear',
+          cleared: 'none'
+        });
+      }
+    } catch (error) {
+      logError(req, 'Failed to clear market data cache', error);
+      res.status(500).json({ message: 'Failed to clear market data cache' });
     }
   });
 

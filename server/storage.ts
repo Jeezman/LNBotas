@@ -22,6 +22,7 @@ export interface IStorage {
   // Market data operations
   getMarketData(symbol: string): Promise<MarketData | undefined>;
   updateMarketData(data: InsertMarketData): Promise<MarketData>;
+  clearMarketData(symbol?: string): Promise<boolean>;
 
   // Deposit operations
   getDeposit(id: number): Promise<Deposit | undefined>;
@@ -204,6 +205,17 @@ export class MemStorage implements IStorage {
     return marketData;
   }
 
+  async clearMarketData(symbol?: string): Promise<boolean> {
+    if (symbol) {
+      // Clear specific symbol
+      return this.marketData.delete(symbol);
+    } else {
+      // Clear all market data
+      this.marketData.clear();
+      return true;
+    }
+  }
+
   // Deposit operations
   async getDeposit(id: number): Promise<Deposit | undefined> {
     return this.deposits.get(id);
@@ -361,6 +373,18 @@ export class DatabaseStorage implements IStorage {
         .values(data)
         .returning();
       return inserted;
+    }
+  }
+
+  async clearMarketData(symbol?: string): Promise<boolean> {
+    if (symbol) {
+      // Clear specific symbol
+      const result = await db.delete(marketData).where(eq(marketData.symbol, symbol));
+      return (result.rowCount || 0) > 0;
+    } else {
+      // Clear all market data
+      const result = await db.delete(marketData);
+      return (result.rowCount || 0) >= 0; // Returns true even if no rows deleted
     }
   }
 
