@@ -41,9 +41,9 @@ export interface MarketTicker {
 }
 
 export interface LNMarketsTrade {
+  id: string;
   uid: string;
   type: 'm' | 'l'; // market or limit
-  id: string;
   side: 'b' | 's'; // buy or sell
   opening_fee: number;
   closing_fee: number;
@@ -53,10 +53,15 @@ export interface LNMarketsTrade {
   leverage: number;
   price: number;
   liquidation: number;
+  stoploss: number;
+  takeprofit: number;
+  exit_price: number | null;
   pl: number;
   creation_ts: number;
-  market_filled_ts: number;
+  market_filled_ts: number | null;
   closed_ts: number | null;
+  entry_price: number;
+  entry_margin: number;
   open: boolean;
   running: boolean;
   canceled: boolean;
@@ -110,7 +115,7 @@ export class LNMarketsService {
   async getFuturesTrades(
     type: 'open' | 'closed' | 'running' = 'open'
   ): Promise<LNMarketsTrade[]> {
-    return this.client.futuresGetTrades({ type });
+    return this.client.futuresGetTrades({ type, from: 1714633904 });
   }
 
   async updateFuturesTrade(

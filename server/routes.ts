@@ -2,7 +2,11 @@ import type { Express, Request, Response } from 'express';
 import { createServer, type Server } from 'http';
 import { storage } from './storage';
 import { insertTradeSchema, insertDepositSchema } from '@shared/schema';
-import { createLNMarketsService, type MarketTicker, type LNMarketsTrade } from './services/lnmarkets';
+import {
+  createLNMarketsService,
+  type MarketTicker,
+  type LNMarketsTrade,
+} from './services/lnmarkets';
 import { z } from 'zod';
 import bcrypt from 'bcrypt';
 
@@ -137,14 +141,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const marketDataUpdate = {
         symbol: 'BTC/USD',
         lastPrice: marketTicker.lastPrice.toString(),
-        markPrice: futuresMarket?.mark_price?.toString() || marketTicker.lastPrice.toString(), // Fallback to last price
-        indexPrice: futuresMarket?.index_price?.toString() || marketTicker.index.toString(), // Use index from ticker
+        markPrice:
+          futuresMarket?.mark_price?.toString() ||
+          marketTicker.lastPrice.toString(), // Fallback to last price
+        indexPrice:
+          futuresMarket?.index_price?.toString() ||
+          marketTicker.index.toString(), // Use index from ticker
         high24h: null, // Not available in current response
         low24h: null, // Not available in current response
         volume24h: null, // Not available in current response
         volumeUSD: volumeUSD,
         openInterest: futuresMarket?.open_interest?.toString() || null,
-        fundingRate: futuresMarket?.funding_rate?.toString() || marketTicker.carryFeeRate.toString(),
+        fundingRate:
+          futuresMarket?.funding_rate?.toString() ||
+          marketTicker.carryFeeRate.toString(),
         priceChange24h: null, // Not available in current response
         nextFundingTime: futuresMarket?.next_funding_time
           ? new Date(futuresMarket.next_funding_time * 1000)
@@ -180,23 +190,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { symbol } = req.query;
       const symbolToClose = symbol as string | undefined;
-      
+
       const success = await storage.clearMarketData(symbolToClose);
-      
+
       if (success) {
-        const message = symbolToClose 
+        const message = symbolToClose
           ? `Market data cache cleared for ${symbolToClose}`
           : 'All market data cache cleared';
         logSuccess(req, message);
-        res.json({ 
+        res.json({
           message,
-          cleared: symbolToClose || 'all'
+          cleared: symbolToClose || 'all',
         });
       } else {
         logRequest(req, 'No market data found to clear');
-        res.json({ 
+        res.json({
           message: 'No market data found to clear',
-          cleared: 'none'
+          cleared: 'none',
         });
       }
     } catch (error) {
@@ -750,12 +760,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           await storage.updateTrade(existingTrade.id, {
             status: newStatus,
-            entryPrice: lnTrade.price?.toString(),
-            exitPrice: lnTrade.closed ? lnTrade.price?.toString() : null, // Use price as exit when closed
+            entryPrice: lnTrade.entry_price?.toString(),
+            exitPrice: lnTrade.exit_price?.toString(),
             pnl: lnTrade.pl?.toString(),
             pnlUSD: null, // Not provided in response, will calculate separately
             liquidationPrice: lnTrade.liquidation?.toString(),
-            fee: (lnTrade.opening_fee + lnTrade.closing_fee + lnTrade.sum_carry_fees),
+            takeProfit: lnTrade.takeprofit ? lnTrade.takeprofit.toString() : null,
+            stopLoss: lnTrade.stoploss ? lnTrade.stoploss.toString() : null,
+            fee:
+              lnTrade.opening_fee +
+              lnTrade.closing_fee +
+              lnTrade.sum_carry_fees,
             updatedAt: new Date(),
           });
           updatedCount++;
@@ -782,17 +797,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
             side: lnTrade.side === 'b' ? 'buy' : 'sell',
             orderType: lnTrade.type === 'l' ? 'limit' : 'market',
             status: status,
-            entryPrice: lnTrade.price?.toString(),
-            exitPrice: lnTrade.closed ? lnTrade.price?.toString() : null, // Use price as exit when closed
+            entryPrice: lnTrade.entry_price?.toString(),
+            exitPrice: lnTrade.exit_price?.toString(),
             margin: lnTrade.margin,
             leverage: lnTrade.leverage?.toString(),
             quantity: lnTrade.quantity?.toString(),
-            takeProfit: null, // Not available in response
-            stopLoss: null, // Not available in response
+            takeProfit: lnTrade.takeprofit ? lnTrade.takeprofit.toString() : null,
+            stopLoss: lnTrade.stoploss ? lnTrade.stoploss.toString() : null,
             pnl: lnTrade.pl?.toString(),
             pnlUSD: null, // Not provided in response, will calculate separately
             liquidationPrice: lnTrade.liquidation?.toString(),
-            fee: (lnTrade.opening_fee + lnTrade.closing_fee + lnTrade.sum_carry_fees),
+            fee:
+              lnTrade.opening_fee +
+              lnTrade.closing_fee +
+              lnTrade.sum_carry_fees,
             instrumentName: 'BTC/USD',
           });
           syncedCount++;

@@ -65,11 +65,13 @@ async function syncAllUserTrades() {
 
             await storage.updateTrade(existingTrade.id, {
               status: status,
-              entryPrice: lnTrade.price?.toString(),
-              exitPrice: lnTrade.closed ? lnTrade.price?.toString() : null,
+              entryPrice: lnTrade.entry_price?.toString(),
+              exitPrice: lnTrade.exit_price?.toString(),
               pnl: lnTrade.pl?.toString(),
               pnlUSD: null, // Not provided in response
               liquidationPrice: lnTrade.liquidation?.toString(),
+              takeProfit: lnTrade.takeprofit ? lnTrade.takeprofit.toString() : null,
+              stopLoss: lnTrade.stoploss ? lnTrade.stoploss.toString() : null,
               fee:
                 lnTrade.opening_fee +
                 lnTrade.closing_fee +
@@ -99,13 +101,13 @@ async function syncAllUserTrades() {
               side: lnTrade.side === 'b' ? 'buy' : 'sell',
               orderType: lnTrade.type === 'l' ? 'limit' : 'market',
               status: status,
-              entryPrice: lnTrade.price?.toString(),
-              exitPrice: lnTrade.closed ? lnTrade.price?.toString() : null,
+              entryPrice: lnTrade.entry_price?.toString(),
+              exitPrice: lnTrade.exit_price?.toString(),
               margin: lnTrade.margin,
               leverage: lnTrade.leverage?.toString(),
               quantity: lnTrade.quantity?.toString(),
-              takeProfit: null, // Not available in response
-              stopLoss: null, // Not available in response
+              takeProfit: lnTrade.takeprofit ? lnTrade.takeprofit.toString() : null,
+              stopLoss: lnTrade.stoploss ? lnTrade.stoploss.toString() : null,
               pnl: lnTrade.pl?.toString(),
               pnlUSD: null, // Not provided in response
               liquidationPrice: lnTrade.liquidation?.toString(),
