@@ -228,7 +228,7 @@ export function useUpdateUserCredentials(userId?: string | number) {
   });
 }
 
-export function useSyncTrades(userId?: string | number) {
+export function useSyncTrades(userId?: string | number, tradeType: 'open' | 'running' | 'closed' | 'all' = 'all') {
   const { toast } = useToast();
   const { user: authUser } = useAuth();
   const userIdParam = userId || authUser?.id;
@@ -237,7 +237,7 @@ export function useSyncTrades(userId?: string | number) {
     mutationFn: async () => {
       if (!userIdParam) throw new Error("User ID is required");
       
-      const response = await apiRequest("POST", "/api/trades/sync", { userId: userIdParam });
+      const response = await apiRequest("POST", "/api/trades/sync", { userId: userIdParam, tradeType });
       return response.json();
     },
     onSuccess: (data: any) => {
@@ -245,15 +245,17 @@ export function useSyncTrades(userId?: string | number) {
       queryClient.invalidateQueries({ queryKey: ['/api/trades', userIdParam] });
       queryClient.invalidateQueries({ queryKey: ['/api/trades', userIdParam, 'active'] });
       
+      const tradeTypeLabel = tradeType === 'all' ? 'All' : tradeType.charAt(0).toUpperCase() + tradeType.slice(1);
       toast({
-        title: "Trades Synced",
-        description: `Synced ${data.totalProcessed} trades from LN Markets (${data.syncedCount} new, ${data.updatedCount} updated)`,
+        title: `${tradeTypeLabel} Trades Synced`,
+        description: `Synced ${data.totalProcessed} ${tradeType === 'all' ? '' : tradeType + ' '}trades from LN Markets (${data.syncedCount} new, ${data.updatedCount} updated)`,
       });
     },
     onError: (error: any) => {
+      const tradeTypeLabel = tradeType === 'all' ? 'All' : tradeType.charAt(0).toUpperCase() + tradeType.slice(1);
       toast({
-        title: "Sync Failed",
-        description: error.message || "Failed to sync trades from LN Markets",
+        title: `${tradeTypeLabel} Sync Failed`,
+        description: error.message || `Failed to sync ${tradeType} trades from LN Markets`,
         variant: "destructive",
       });
     },

@@ -20,12 +20,12 @@ export function MarketOverview() {
     );
   }
 
-  const formatPrice = (price: string | null) => {
+  const formatPrice = (price: string | null | undefined) => {
     if (!price) return "N/A";
     return `$${parseFloat(price).toLocaleString()}`;
   };
 
-  const formatChange = (change: string | null) => {
+  const formatChange = (change: string | null | undefined) => {
     if (!change) return { value: "N/A", isPositive: true };
     const numChange = parseFloat(change);
     return {

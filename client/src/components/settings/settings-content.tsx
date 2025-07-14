@@ -62,8 +62,8 @@ export function SettingsContent() {
     if (userData) {
       form.reset({
         apiKey: userData.apiKey || "",
-        apiSecret: userData.apiSecret || "",
-        apiPassphrase: userData.apiPassphrase || "",
+        apiSecret: "", // Don't pre-populate secrets for security
+        apiPassphrase: "", // Don't pre-populate secrets for security
       });
     }
   }, [userData, form]);

@@ -1,23 +1,44 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
-} from "@/components/ui/table";
-import { useActiveTrades, useCloseTrade, useCloseAllTrades, useSyncTrades } from "@/hooks/use-trading";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Edit, X, RefreshCw } from "lucide-react";
+import { useState } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  useActiveTrades,
+  useCloseTrade,
+  useCloseAllTrades,
+  useSyncTrades,
+} from '@/hooks/use-trading';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Edit, X, RefreshCw, Filter } from 'lucide-react';
+
+type TradeStatusFilter = 'all' | 'open' | 'running' | 'closed';
 
 export function ActivePositions() {
+  const [statusFilter, setStatusFilter] = useState<TradeStatusFilter>('all');
   const { data: trades = [], isLoading } = useActiveTrades();
   const closeTrade = useCloseTrade();
   const closeAllTrades = useCloseAllTrades();
-  const syncTrades = useSyncTrades();
+
+  // Create individual sync hooks for different trade types
+  const syncOpenTrades = useSyncTrades(undefined, 'open');
+  const syncRunningTrades = useSyncTrades(undefined, 'running');
+  const syncClosedTrades = useSyncTrades(undefined, 'closed');
+  const syncAllTrades = useSyncTrades(undefined, 'all');
 
   if (isLoading) {
     return (
@@ -36,6 +57,12 @@ export function ActivePositions() {
     );
   }
 
+  // Filter trades based on selected status
+  const filteredTrades = trades.filter((trade) => {
+    if (statusFilter === 'all') return true;
+    return trade.status === statusFilter;
+  });
+
   const handleCloseTrade = (tradeId: number) => {
     closeTrade.mutate(tradeId);
   };
@@ -44,28 +71,94 @@ export function ActivePositions() {
     closeAllTrades.mutate();
   };
 
-  const handleSync = () => {
-    syncTrades.mutate();
+  const getSideBadgeVariant = (side: string) => {
+    return side === 'buy' ? 'default' : 'destructive';
   };
 
   return (
     <Card>
       <CardHeader>
         <div className="flex items-center justify-between">
-          <CardTitle className="text-lg font-semibold text-gray-900">Active Positions</CardTitle>
+          <div className="flex items-center gap-4">
+            <CardTitle className="text-lg font-semibold text-gray-900">
+              Active Positions
+            </CardTitle>
+            <div className="flex items-center gap-2">
+              <Filter className="h-4 w-4 text-gray-500" />
+              <Select
+                value={statusFilter}
+                onValueChange={(value: TradeStatusFilter) =>
+                  setStatusFilter(value)
+                }
+              >
+                <SelectTrigger className="w-32">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="open">Open</SelectItem>
+                  <SelectItem value="running">Running</SelectItem>
+                  <SelectItem value="closed">Closed</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
           <div className="flex items-center space-x-2">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               size="sm"
-              onClick={handleSync}
-              disabled={syncTrades.isPending}
+              onClick={() => syncOpenTrades.mutate()}
+              disabled={syncOpenTrades.isPending}
             >
-              <RefreshCw className={`h-4 w-4 mr-2 ${syncTrades.isPending ? 'animate-spin' : ''}`} />
-              Sync
+              <RefreshCw
+                className={`h-4 w-4 mr-1 ${
+                  syncOpenTrades.isPending ? 'animate-spin' : ''
+                }`}
+              />
+              Open
             </Button>
-            {trades.length > 0 && (
-              <Button 
-                variant="outline" 
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => syncRunningTrades.mutate()}
+              disabled={syncRunningTrades.isPending}
+            >
+              <RefreshCw
+                className={`h-4 w-4 mr-1 ${
+                  syncRunningTrades.isPending ? 'animate-spin' : ''
+                }`}
+              />
+              Running
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => syncClosedTrades.mutate()}
+              disabled={syncClosedTrades.isPending}
+            >
+              <RefreshCw
+                className={`h-4 w-4 mr-1 ${
+                  syncClosedTrades.isPending ? 'animate-spin' : ''
+                }`}
+              />
+              Closed
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => syncAllTrades.mutate()}
+              disabled={syncAllTrades.isPending}
+            >
+              <RefreshCw
+                className={`h-4 w-4 mr-1 ${
+                  syncAllTrades.isPending ? 'animate-spin' : ''
+                }`}
+              />
+              All
+            </Button>
+            {filteredTrades.length > 0 && (
+              <Button
+                variant="outline"
                 size="sm"
                 onClick={handleCloseAll}
                 disabled={closeAllTrades.isPending}
@@ -77,10 +170,20 @@ export function ActivePositions() {
         </div>
       </CardHeader>
       <CardContent>
-        {trades.length === 0 ? (
+        {filteredTrades.length === 0 ? (
           <div className="text-center py-8">
-            <p className="text-gray-500">No active positions</p>
-            <p className="text-sm text-gray-400">Create a new trade to see positions here</p>
+            <p className="text-gray-500">
+              {trades.length === 0
+                ? 'No active positions'
+                : `No ${
+                    statusFilter === 'all' ? '' : statusFilter + ' '
+                  }positions`}
+            </p>
+            <p className="text-sm text-gray-400">
+              {trades.length === 0
+                ? 'Create a new trade to see positions here'
+                : 'Try selecting a different filter'}
+            </p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -89,6 +192,7 @@ export function ActivePositions() {
                 <TableRow>
                   <TableHead>Type</TableHead>
                   <TableHead>Side</TableHead>
+                  <TableHead>Status</TableHead>
                   <TableHead>Entry Price</TableHead>
                   <TableHead>Size</TableHead>
                   <TableHead>PnL</TableHead>
@@ -96,34 +200,68 @@ export function ActivePositions() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {trades.map((trade) => (
+                {filteredTrades.map((trade) => (
                   <TableRow key={trade.id}>
                     <TableCell>
-                      <Badge variant={trade.type === 'futures' ? 'default' : 'secondary'}>
+                      <Badge
+                        variant={
+                          trade.type === 'futures' ? 'default' : 'secondary'
+                        }
+                      >
                         {trade.type}
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <Badge 
-                        variant={trade.side === 'buy' ? 'default' : 'destructive'}
-                        className={trade.side === 'buy' ? 'bg-success text-white' : 'bg-danger text-white'}
-                      >
+                      <Badge variant={getSideBadgeVariant(trade.side)}>
                         {trade.side === 'buy' ? 'Long' : 'Short'}
                       </Badge>
                     </TableCell>
-                    <TableCell className="font-mono text-sm">
-                      {trade.entryPrice ? `$${parseFloat(trade.entryPrice).toLocaleString()}` : 'Pending'}
+                    <TableCell>
+                      <Badge
+                        variant={
+                          trade.status === 'running' ? 'default' : 'secondary'
+                        }
+                        className={
+                          trade.status === 'running'
+                            ? 'bg-green-600 text-white'
+                            : trade.status === 'open'
+                            ? 'bg-yellow-600 text-white'
+                            : 'bg-gray-600 text-white'
+                        }
+                      >
+                        {trade.status === 'running' 
+                          ? 'Running' 
+                          : trade.status === 'open'
+                          ? 'Open'
+                          : trade.status.charAt(0).toUpperCase() + trade.status.slice(1)}
+                      </Badge>
                     </TableCell>
                     <TableCell className="font-mono text-sm">
-                      {trade.quantity ? `₿ ${parseFloat(trade.quantity).toFixed(4)}` : 'N/A'}
+                      {trade.entryPrice
+                        ? `$${parseFloat(trade.entryPrice).toLocaleString()}`
+                        : 'Pending'}
+                    </TableCell>
+                    <TableCell className="font-mono text-sm">
+                      {trade.quantity
+                        ? `₿ ${parseFloat(trade.quantity).toFixed(4)}`
+                        : 'N/A'}
                     </TableCell>
                     <TableCell>
                       {trade.pnlUSD ? (
-                        <span className={`font-mono text-sm ${parseFloat(trade.pnlUSD) >= 0 ? 'text-success' : 'text-danger'}`}>
-                          {parseFloat(trade.pnlUSD) >= 0 ? '+' : ''}${parseFloat(trade.pnlUSD).toFixed(2)}
+                        <span
+                          className={`font-mono text-sm ${
+                            parseFloat(trade.pnlUSD) >= 0
+                              ? 'text-success'
+                              : 'text-danger'
+                          }`}
+                        >
+                          {parseFloat(trade.pnlUSD) >= 0 ? '+' : ''}$
+                          {parseFloat(trade.pnlUSD).toFixed(2)}
                         </span>
                       ) : (
-                        <span className="font-mono text-sm text-gray-500">--</span>
+                        <span className="font-mono text-sm text-gray-500">
+                          --
+                        </span>
                       )}
                     </TableCell>
                     <TableCell>
@@ -131,8 +269,8 @@ export function ActivePositions() {
                         <Button variant="ghost" size="sm">
                           <Edit className="h-4 w-4" />
                         </Button>
-                        <Button 
-                          variant="ghost" 
+                        <Button
+                          variant="ghost"
                           size="sm"
                           onClick={() => handleCloseTrade(trade.id)}
                           disabled={closeTrade.isPending}

@@ -1,7 +1,7 @@
 import type { Express, Request, Response } from 'express';
 import { createServer, type Server } from 'http';
 import { storage } from './storage';
-import { insertTradeSchema, insertDepositSchema } from '@shared/schema';
+import { insertTradeSchema, insertDepositSchema, validateTradeStatusTransition, updateTradeStatusSchema, type TradeStatus } from '@shared/schema';
 import {
   createLNMarketsService,
   type MarketTicker,
@@ -682,7 +682,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/trades/sync', async (req, res) => {
     logRequest(req, 'Starting trade sync from LN Markets');
     try {
-      const { userId } = req.body;
+      const { userId, tradeType = 'all' } = req.body;
 
       if (!userId) {
         logError(
@@ -693,7 +693,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'User ID is required' });
       }
 
-      logRequest(req, 'Fetching user credentials for sync', { userId });
+      logRequest(req, 'Fetching user credentials for sync', {
+        userId,
+        tradeType,
+      });
       const user = await storage.getUser(userId);
       if (!user || !user.apiKey || !user.apiSecret || !user.apiPassphrase) {
         logError(
@@ -713,9 +716,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         network: 'mainnet',
       });
 
-      // Fetch futures trades from LN Markets
-      logRequest(req, 'Fetching futures trades from LN Markets API');
-      const futuresTrades = await lnMarketsService.getFuturesTrades();
+      // Fetch futures trades from LN Markets based on trade type
+      logRequest(
+        req,
+        `Fetching ${tradeType} futures trades from LN Markets API`
+      );
+      let futuresTrades = [];
+
+      if (tradeType === 'all') {
+        // Fetch all trade types
+        const [openTrades, runningTrades] = await Promise.all([
+          lnMarketsService.getFuturesTrades('open'),
+          lnMarketsService.getFuturesTrades('running'),
+          // lnMarketsService.getFuturesTrades('closed')
+        ]);
+        futuresTrades = [...openTrades, ...runningTrades];
+      } else {
+        // Fetch specific trade type
+        futuresTrades = await lnMarketsService.getFuturesTrades(
+          tradeType as 'open' | 'running' | 'closed'
+        );
+      }
       let syncedCount = 0;
       let updatedCount = 0;
       logRequest(req, 'Processing futures trades', {
@@ -733,17 +754,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (existingTrade) {
           // Update existing trade with latest data from LN Markets
           // Determine status based on LN Markets flags
-          let newStatus: string;
+          let newStatus: TradeStatus;
           if (lnTrade.closed) {
             newStatus = 'closed';
           } else if (lnTrade.running) {
-            newStatus = 'open'; // Running trades are actively open
+            newStatus = 'running'; // Running trades are actively running
           } else if (lnTrade.open) {
-            newStatus = 'pending'; // Open but not running = waiting for limit price
+            newStatus = 'open'; // Open but not running = waiting for limit price
           } else if (lnTrade.canceled) {
             newStatus = 'cancelled';
           } else {
-            newStatus = 'pending';
+            newStatus = 'open';
           }
 
           logRequest(
@@ -765,7 +786,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             pnl: lnTrade.pl?.toString(),
             pnlUSD: null, // Not provided in response, will calculate separately
             liquidationPrice: lnTrade.liquidation?.toString(),
-            takeProfit: lnTrade.takeprofit ? lnTrade.takeprofit.toString() : null,
+            takeProfit: lnTrade.takeprofit
+              ? lnTrade.takeprofit.toString()
+              : null,
             stopLoss: lnTrade.stoploss ? lnTrade.stoploss.toString() : null,
             fee:
               lnTrade.opening_fee +
@@ -777,17 +800,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         } else {
           // Create new trade from LN Markets data
           // Determine status based on LN Markets flags
-          let status: string;
+          let status: TradeStatus;
           if (lnTrade.closed) {
             status = 'closed';
           } else if (lnTrade.running) {
-            status = 'open'; // Running trades are actively open
+            status = 'running'; // Running trades are actively running
           } else if (lnTrade.open) {
-            status = 'pending'; // Open but not running = waiting for limit price
+            status = 'open'; // Open but not running = waiting for limit price
           } else if (lnTrade.canceled) {
             status = 'cancelled';
           } else {
-            status = 'pending';
+            status = 'open';
           }
 
           await storage.createTrade({
@@ -802,7 +825,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             margin: lnTrade.margin,
             leverage: lnTrade.leverage?.toString(),
             quantity: lnTrade.quantity?.toString(),
-            takeProfit: lnTrade.takeprofit ? lnTrade.takeprofit.toString() : null,
+            takeProfit: lnTrade.takeprofit
+              ? lnTrade.takeprofit.toString()
+              : null,
             stopLoss: lnTrade.stoploss ? lnTrade.stoploss.toString() : null,
             pnl: lnTrade.pl?.toString(),
             pnlUSD: null, // Not provided in response, will calculate separately
@@ -876,7 +901,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const result = {
-        message: 'Trades synced successfully',
+        message: `${
+          tradeType.charAt(0).toUpperCase() + tradeType.slice(1)
+        } trades synced successfully`,
+        tradeType,
         syncedCount,
         updatedCount,
         totalProcessed: syncedCount + updatedCount,

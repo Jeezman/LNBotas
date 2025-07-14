@@ -1,5 +1,6 @@
 import { storage } from '../storage';
 import { createLNMarketsService, type LNMarketsTrade } from './lnmarkets';
+import type { TradeStatus } from '../../shared/schema';
 
 // Sync interval in milliseconds (3  minutes)
 const SYNC_INTERVAL = 3 * 60 * 1000;
@@ -50,17 +51,17 @@ async function syncAllUserTrades() {
 
           if (existingTrade) {
             // Update existing trade with proper status mapping
-            let status: string;
+            let status: TradeStatus;
             if (lnTrade.closed) {
               status = 'closed';
             } else if (lnTrade.running) {
-              status = 'open'; // Running trades are actively open
+              status = 'running'; // Running trades are actively running
             } else if (lnTrade.open) {
-              status = 'pending'; // Open but not running = waiting for limit price
+              status = 'open'; // Open but not running = waiting for limit price
             } else if (lnTrade.canceled) {
               status = 'cancelled';
             } else {
-              status = 'pending';
+              status = 'open';
             }
 
             await storage.updateTrade(existingTrade.id, {
@@ -81,17 +82,17 @@ async function syncAllUserTrades() {
             userUpdated++;
           } else {
             // Create new trade with proper status mapping
-            let status: string;
+            let status: TradeStatus;
             if (lnTrade.closed) {
               status = 'closed';
             } else if (lnTrade.running) {
-              status = 'open'; // Running trades are actively open
+              status = 'running'; // Running trades are actively running
             } else if (lnTrade.open) {
-              status = 'pending'; // Open but not running = waiting for limit price
+              status = 'open'; // Open but not running = waiting for limit price
             } else if (lnTrade.canceled) {
               status = 'cancelled';
             } else {
-              status = 'pending';
+              status = 'open';
             }
 
             await storage.createTrade({

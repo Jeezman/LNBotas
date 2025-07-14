@@ -11,7 +11,7 @@ import { TrendingUp, TrendingDown, Clock, CheckCircle, XCircle, Filter, RefreshC
 import { Trade } from "@/lib/api";
 import { formatDistanceToNow } from "date-fns";
 
-type TradeStatus = "all" | "open" | "closed" | "pending" | "cancelled";
+type TradeStatus = "all" | "open" | "closed" | "running" | "cancelled";
 type TradeType = "all" | "futures" | "options";
 
 export default function FuturesPage() {
@@ -40,12 +40,12 @@ export default function FuturesPage() {
   const getStatusIcon = (status: string) => {
     console.log('status ', status)
     switch (status) {
-      case "open":
+      case "running":
         return <TrendingUp className="h-4 w-4 text-green-500" />;
+      case "open":
+        return <Clock className="h-4 w-4 text-yellow-500" />;
       case "closed":
         return <CheckCircle className="h-4 w-4 text-gray-500" />;
-      case "pending":
-        return <Clock className="h-4 w-4 text-yellow-500" />;
       case "cancelled":
         return <XCircle className="h-4 w-4 text-red-500" />;
       default:
@@ -55,12 +55,12 @@ export default function FuturesPage() {
 
   const getStatusBadgeVariant = (status: string) => {
     switch (status) {
-      case "open":
+      case "running":
         return "default";
+      case "open":
+        return "outline";
       case "closed":
         return "secondary";
-      case "pending":
-        return "outline";
       case "cancelled":
         return "destructive";
       default:
@@ -118,10 +118,10 @@ export default function FuturesPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {allTradesData.filter(trade => trade.status === "open").length}
+              {allTradesData.filter(trade => trade.status === "running").length}
             </div>
             <p className="text-xs text-muted-foreground">
-              Currently open positions
+              Currently running positions
             </p>
           </CardContent>
         </Card>
@@ -141,12 +141,12 @@ export default function FuturesPage() {
         
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pending Orders</CardTitle>
+            <CardTitle className="text-sm font-medium">Open Orders</CardTitle>
             <Clock className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {allTradesData.filter(trade => trade.status === "pending").length}
+              {allTradesData.filter(trade => trade.status === "open").length}
             </div>
             <p className="text-xs text-muted-foreground">
               Awaiting execution
@@ -208,8 +208,8 @@ export default function FuturesPage() {
                 <SelectContent>
                   <SelectItem value="all">All Status</SelectItem>
                   <SelectItem value="open">Open</SelectItem>
+                  <SelectItem value="running">Running</SelectItem>
                   <SelectItem value="closed">Closed</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
                   <SelectItem value="cancelled">Cancelled</SelectItem>
                 </SelectContent>
               </Select>
@@ -294,7 +294,7 @@ export default function FuturesPage() {
                         {formatDistanceToNow(new Date(trade.createdAt), { addSuffix: true })}
                       </TableCell>
                       <TableCell>
-                        {trade.status === "open" && (
+                        {(trade.status === "running" || trade.status === "open") && (
                           <Button variant="outline" size="sm">
                             Manage
                           </Button>

@@ -2,6 +2,9 @@ import { pgTable, text, serial, integer, boolean, decimal, timestamp } from "dri
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+// Trade status enum
+export const tradeStatusEnum = z.enum(['open', 'running', 'closed', 'cancelled']);
+
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   username: text("username").notNull().unique(),
@@ -20,7 +23,7 @@ export const trades = pgTable("trades", {
   type: text("type").notNull(), // 'futures' | 'options'
   side: text("side").notNull(), // 'buy' | 'sell'
   orderType: text("order_type").notNull(), // 'market' | 'limit'
-  status: text("status").notNull(), // 'open' | 'closed' | 'pending' | 'cancelled'
+  status: text("status").notNull(), // 'open' | 'running' | 'closed' | 'cancelled'
   entryPrice: decimal("entry_price", { precision: 18, scale: 2 }),
   exitPrice: decimal("exit_price", { precision: 18, scale: 2 }),
   margin: integer("margin"), // in satoshis
@@ -82,6 +85,8 @@ export const insertTradeSchema = createInsertSchema(trades).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
+}).extend({
+  status: tradeStatusEnum,
 });
 
 export const insertMarketDataSchema = createInsertSchema(marketData).omit({
@@ -103,3 +108,31 @@ export type InsertMarketData = z.infer<typeof insertMarketDataSchema>;
 export type MarketData = typeof marketData.$inferSelect;
 export type InsertDeposit = z.infer<typeof insertDepositSchema>;
 export type Deposit = typeof deposits.$inferSelect;
+
+export type TradeStatus = z.infer<typeof tradeStatusEnum>;
+
+// Trade status transition validation
+export function validateTradeStatusTransition(currentStatus: string | null, newStatus: TradeStatus): boolean {
+  // If no current status (new trade), allow any status
+  if (!currentStatus) {
+    return true;
+  }
+
+  // Cancelled status can only be applied to trades that were in 'open' state
+  if (newStatus === 'cancelled' && currentStatus !== 'open') {
+    return false;
+  }
+
+  return true;
+}
+
+// Schema for updating trade status with validation
+export const updateTradeStatusSchema = z.object({
+  status: tradeStatusEnum,
+  currentStatus: z.string().optional(),
+}).refine((data) => {
+  return validateTradeStatusTransition(data.currentStatus ?? null, data.status);
+}, {
+  message: "Cancelled status can only be applied to trades that were in 'open' state",
+  path: ['status'],
+});

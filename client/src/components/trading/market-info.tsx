@@ -22,12 +22,12 @@ export function MarketInfo() {
     );
   }
 
-  const formatPrice = (price: string | null) => {
+  const formatPrice = (price: string | null | undefined) => {
     if (!price) return "N/A";
     return `$${parseFloat(price).toLocaleString()}`;
   };
 
-  const formatTime = (timeStr: string | null) => {
+  const formatTime = (timeStr: string | null | undefined) => {
     if (!timeStr) return "N/A";
     const time = new Date(timeStr);
     const now = new Date();

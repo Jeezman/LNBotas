@@ -1,6 +1,6 @@
 import { users, trades, marketData, deposits, type User, type InsertUser, type Trade, type InsertTrade, type MarketData, type InsertMarketData, type Deposit, type InsertDeposit } from "@shared/schema";
 import { db } from "./db";
-import { eq, and } from "drizzle-orm";
+import { eq, and, or } from "drizzle-orm";
 
 export interface IStorage {
   // User operations
@@ -127,7 +127,7 @@ export class MemStorage implements IStorage {
 
   async getActiveTradesByUserId(userId: number): Promise<Trade[]> {
     return Array.from(this.trades.values()).filter(
-      (trade) => trade.userId === userId && trade.status === 'open',
+      (trade) => trade.userId === userId && (trade.status === 'open' || trade.status === 'running'),
     );
   }
 
@@ -318,7 +318,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getActiveTradesByUserId(userId: number): Promise<Trade[]> {
-    return db.select().from(trades).where(and(eq(trades.userId, userId), eq(trades.status, 'open')));
+    return db.select().from(trades).where(
+      and(
+        eq(trades.userId, userId), 
+        or(eq(trades.status, 'open'), eq(trades.status, 'running'))
+      )
+    );
   }
 
   async createTrade(insertTrade: InsertTrade): Promise<Trade> {
