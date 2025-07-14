@@ -52,9 +52,8 @@ export class MemStorage implements IStorage {
     this.currentMarketDataId = 1;
     this.currentDepositId = 1;
     
-    // Create demo user and sample data
+    // Create demo user
     this.createDemoUser();
-    this.createSampleMarketData();
   }
 
   private createDemoUser() {
@@ -66,32 +65,12 @@ export class MemStorage implements IStorage {
       apiSecret: null,
       apiPassphrase: null,
       balance: '0.00100000', // 0.001 BTC
-      balanceUSD: '43.75', // Approximate USD value
+      balanceUSD: '0.00', // USD value calculated dynamically
     };
     this.users.set(1, demoUser);
     this.currentUserId = 2; // Start next user ID from 2
   }
 
-  private createSampleMarketData() {
-    const sampleMarketData: MarketData = {
-      id: 1,
-      symbol: 'BTC/USD',
-      lastPrice: '43750.00',
-      markPrice: '43748.50',
-      indexPrice: '43751.25',
-      high24h: '44200.00',
-      low24h: '43100.00',
-      volume24h: '1250.50000000',
-      volumeUSD: '54706875.00',
-      openInterest: '8500.25000000',
-      fundingRate: '0.000125',
-      priceChange24h: '1.85',
-      nextFundingTime: new Date(Date.now() + 6 * 60 * 60 * 1000), // 6 hours from now
-      updatedAt: new Date(),
-    };
-    this.marketData.set('BTC/USD', sampleMarketData);
-    this.currentMarketDataId = 2;
-  }
 
   async getUser(id: number): Promise<User | undefined> {
     return this.users.get(id);

@@ -127,9 +127,8 @@ export class LNMarketsService {
     return this.client.futuresGetTicker();
   }
 
-  async getFuturesMarket(): Promise<any> {
-    return this.client.futuresGetMarket();
-  }
+  // Note: futuresGetMarket() method is not available in the LN Markets API
+  // Market data can be obtained through getFuturesTicker() method
 
   async getPriceHistory(from?: number, to?: number): Promise<any[]> {
     return this.client.futuresGetPriceHistory({ from, to });

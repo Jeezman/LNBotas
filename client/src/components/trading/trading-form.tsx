@@ -61,14 +61,14 @@ export function TradingForm() {
     });
   };
 
-  const currentPrice = marketData?.lastPrice ? parseFloat(marketData.lastPrice) : 43750;
+  const currentPrice = marketData?.lastPrice ? parseFloat(marketData.lastPrice) : 0;
   const margin = form.watch('margin');
   const leverage = form.watch('leverage');
   
-  const positionSize = margin && leverage ? 
+  const positionSize = margin && leverage && currentPrice > 0 ? 
     (parseInt(margin) * parseFloat(leverage) / currentPrice / 100000000).toFixed(6) : '0.000000';
   const estimatedFee = margin ? Math.max(1, Math.floor(parseInt(margin) * 0.001)) : 0;
-  const liquidationPrice = margin && leverage && side ? 
+  const liquidationPrice = margin && leverage && side && currentPrice > 0 ? 
     (currentPrice * (1 - (side === 'buy' ? 0.9 : -0.9) / parseFloat(leverage))).toFixed(2) : '0.00';
 
   return (
