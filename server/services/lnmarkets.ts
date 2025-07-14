@@ -26,13 +26,18 @@ export interface OptionsTradeRequest {
 }
 
 export interface MarketTicker {
-  last: string;
-  bid: string;
-  ask: string;
-  high: string;
-  low: string;
-  volume: string;
-  change: string;
+  index: number;
+  lastPrice: number;
+  askPrice: number;
+  bidPrice: number;
+  carryFeeRate: number;
+  carryFeeTimestamp: number;
+  exchangesWeights: {
+    bitmex: number;
+    bybit: number;
+    deribit: number;
+    binance: number;
+  };
 }
 
 export interface UserInfo {
@@ -79,7 +84,7 @@ export class LNMarketsService {
   }
 
   async getFuturesTrades(
-    type: 'open' | 'closed' | 'pending' = 'open'
+    type: 'open' | 'closed' | 'running' = 'open'
   ): Promise<any[]> {
     return this.client.futuresGetTrades({ type });
   }
