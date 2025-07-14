@@ -1,6 +1,5 @@
 import { Sidebar } from '@/components/layout/sidebar';
 import { MarketOverview } from '@/components/trading/market-overview';
-import { PriceChart } from '@/components/trading/price-chart';
 import { ActivePositions } from '@/components/trading/active-positions';
 import { TradingForm } from '@/components/trading/trading-form';
 import { MarketInfo } from '@/components/trading/market-info';
@@ -22,7 +21,6 @@ function DashboardContent() {
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mt-6">
         {/* Trading Panel */}
         <div className="xl:col-span-2 space-y-6">
-          <PriceChart />
           <ActivePositions />
         </div>
 
@@ -136,7 +134,10 @@ export default function Dashboard() {
                   <p className="text-xs text-gray-500">USD Equivalent</p>
                   <p className="text-lg font-mono font-semibold text-gray-900">
                     {user?.balanceUSD
-                      ? `$${parseFloat(user.balanceUSD).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`
+                      ? `$${parseFloat(user.balanceUSD).toLocaleString(
+                          'en-US',
+                          { minimumFractionDigits: 2, maximumFractionDigits: 2 }
+                        )}`
                       : '$0.00'}
                   </p>
                 </div>

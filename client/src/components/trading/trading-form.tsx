@@ -141,7 +141,7 @@ export function TradingForm() {
                     setSide('buy');
                     form.setValue('side', 'buy');
                   }}
-                  className={side === 'buy' ? 'bg-success text-white' : ''}
+                  className={side === 'buy' ? 'bg-green-600 hover:bg-green-700 text-white' : 'text-green-600 border-green-600 hover:bg-green-50'}
                 >
                   Buy / Long
                 </Button>
@@ -152,7 +152,7 @@ export function TradingForm() {
                     setSide('sell');
                     form.setValue('side', 'sell');
                   }}
-                  className={side === 'sell' ? 'bg-danger text-white' : ''}
+                  className={side === 'sell' ? 'bg-red-600 hover:bg-red-700 text-white' : 'text-red-600 border-red-600 hover:bg-red-50'}
                 >
                   Sell / Short
                 </Button>

@@ -72,6 +72,12 @@ export default function FuturesPage() {
     return side === "buy" ? "default" : "destructive";
   };
 
+  const getSideBadgeClassName = (side: string) => {
+    return side === "buy" 
+      ? "bg-green-600 text-white hover:bg-green-700" 
+      : "bg-red-600 text-white hover:bg-red-700";
+  };
+
   const formatPrice = (price: string | null) => {
     if (!price) return "—";
     return `$${parseFloat(price).toLocaleString()}`;
@@ -277,7 +283,10 @@ export default function FuturesPage() {
                         <Badge variant="outline">{trade.type}</Badge>
                       </TableCell>
                       <TableCell>
-                        <Badge variant={getSideBadgeVariant(trade.side)}>
+                        <Badge 
+                          variant={getSideBadgeVariant(trade.side)}
+                          className={getSideBadgeClassName(trade.side)}
+                        >
                           {trade.side}
                         </Badge>
                       </TableCell>
