@@ -2,7 +2,7 @@ import type { Express, Request, Response } from 'express';
 import { createServer, type Server } from 'http';
 import { storage } from './storage';
 import { insertTradeSchema, insertDepositSchema } from '@shared/schema';
-import { createLNMarketsService, type MarketTicker } from './services/lnmarkets';
+import { createLNMarketsService, type MarketTicker, type LNMarketsTrade } from './services/lnmarkets';
 import { z } from 'zod';
 import bcrypt from 'bcrypt';
 
@@ -722,46 +722,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         if (existingTrade) {
           // Update existing trade with latest data from LN Markets
-          const newStatus = lnTrade.closed ? 'closed' : 'open';
+          // Determine status based on LN Markets flags
+          let newStatus: string;
+          if (lnTrade.closed) {
+            newStatus = 'closed';
+          } else if (lnTrade.running) {
+            newStatus = 'open'; // Running trades are actively open
+          } else if (lnTrade.open) {
+            newStatus = 'pending'; // Open but not running = waiting for limit price
+          } else if (lnTrade.canceled) {
+            newStatus = 'cancelled';
+          } else {
+            newStatus = 'pending';
+          }
+
           logRequest(
             req,
             `Updating trade ${existingTrade.id} from ${existingTrade.status} to ${newStatus}`,
             {
               lnMarketsId: lnTrade.id,
               closed: lnTrade.closed,
-              exitPrice: lnTrade.exit_price,
+              running: lnTrade.running,
+              open: lnTrade.open,
+              canceled: lnTrade.canceled,
             }
           );
 
           await storage.updateTrade(existingTrade.id, {
             status: newStatus,
             entryPrice: lnTrade.price?.toString(),
-            exitPrice: lnTrade.exit_price?.toString(),
+            exitPrice: lnTrade.closed ? lnTrade.price?.toString() : null, // Use price as exit when closed
             pnl: lnTrade.pl?.toString(),
-            pnlUSD: lnTrade.pl_usd?.toString(),
+            pnlUSD: null, // Not provided in response, will calculate separately
             liquidationPrice: lnTrade.liquidation?.toString(),
+            fee: (lnTrade.opening_fee + lnTrade.closing_fee + lnTrade.sum_carry_fees),
             updatedAt: new Date(),
           });
           updatedCount++;
         } else {
           // Create new trade from LN Markets data
+          // Determine status based on LN Markets flags
+          let status: string;
+          if (lnTrade.closed) {
+            status = 'closed';
+          } else if (lnTrade.running) {
+            status = 'open'; // Running trades are actively open
+          } else if (lnTrade.open) {
+            status = 'pending'; // Open but not running = waiting for limit price
+          } else if (lnTrade.canceled) {
+            status = 'cancelled';
+          } else {
+            status = 'pending';
+          }
+
           await storage.createTrade({
             userId: userId,
             lnMarketsId: lnTrade.id,
             type: 'futures',
             side: lnTrade.side === 'b' ? 'buy' : 'sell',
             orderType: lnTrade.type === 'l' ? 'limit' : 'market',
-            status: lnTrade.closed ? 'closed' : 'open',
+            status: status,
             entryPrice: lnTrade.price?.toString(),
-            exitPrice: lnTrade.exit_price?.toString(),
+            exitPrice: lnTrade.closed ? lnTrade.price?.toString() : null, // Use price as exit when closed
             margin: lnTrade.margin,
             leverage: lnTrade.leverage?.toString(),
             quantity: lnTrade.quantity?.toString(),
-            takeProfit: lnTrade.takeprofit?.toString(),
-            stopLoss: lnTrade.stoploss?.toString(),
+            takeProfit: null, // Not available in response
+            stopLoss: null, // Not available in response
             pnl: lnTrade.pl?.toString(),
-            pnlUSD: lnTrade.pl_usd?.toString(),
+            pnlUSD: null, // Not provided in response, will calculate separately
             liquidationPrice: lnTrade.liquidation?.toString(),
+            fee: (lnTrade.opening_fee + lnTrade.closing_fee + lnTrade.sum_carry_fees),
             instrumentName: 'BTC/USD',
           });
           syncedCount++;
