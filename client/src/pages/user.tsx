@@ -136,7 +136,7 @@ export default function UserPage() {
                 Bitcoin Balance
               </Label>
               <span className="font-mono text-sm">
-                ₿{user.balance || "0.00000000"}
+                ₿{user.balance ? parseFloat(user.balance).toLocaleString() : "0"}
               </span>
             </div>
             
