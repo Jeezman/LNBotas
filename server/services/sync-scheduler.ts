@@ -2,8 +2,8 @@ import { storage } from '../storage';
 import { createLNMarketsService, type LNMarketsTrade } from './lnmarkets';
 import type { TradeStatus } from '../../shared/schema';
 
-// Sync interval in milliseconds (3  minutes)
-const SYNC_INTERVAL = 3 * 60 * 1000;
+// Sync interval in milliseconds (5 minutes)
+const SYNC_INTERVAL = 5 * 60 * 1000;
 
 let syncIntervalId: NodeJS.Timeout | null = null;
 
@@ -71,7 +71,9 @@ async function syncAllUserTrades() {
               pnl: lnTrade.pl?.toString(),
               pnlUSD: null, // Not provided in response
               liquidationPrice: lnTrade.liquidation?.toString(),
-              takeProfit: lnTrade.takeprofit ? lnTrade.takeprofit.toString() : null,
+              takeProfit: lnTrade.takeprofit
+                ? lnTrade.takeprofit.toString()
+                : null,
               stopLoss: lnTrade.stoploss ? lnTrade.stoploss.toString() : null,
               fee:
                 lnTrade.opening_fee +
@@ -107,7 +109,9 @@ async function syncAllUserTrades() {
               margin: lnTrade.margin,
               leverage: lnTrade.leverage?.toString(),
               quantity: lnTrade.quantity?.toString(),
-              takeProfit: lnTrade.takeprofit ? lnTrade.takeprofit.toString() : null,
+              takeProfit: lnTrade.takeprofit
+                ? lnTrade.takeprofit.toString()
+                : null,
               stopLoss: lnTrade.stoploss ? lnTrade.stoploss.toString() : null,
               pnl: lnTrade.pl?.toString(),
               pnlUSD: null, // Not provided in response
@@ -191,8 +195,310 @@ async function syncAllUserTrades() {
   }
 }
 
+// Check and execute scheduled trades
+async function checkScheduledTrades() {
+  console.log('🔍 Checking scheduled trades...');
+
+  try {
+    const pendingScheduledTrades = await storage.getPendingScheduledTrades();
+    console.log(
+      `👀 Found ${pendingScheduledTrades.length} pending scheduled trades`
+    );
+
+    for (const scheduledTrade of pendingScheduledTrades) {
+      console.log(`⚙️ Processing scheduled trade ${scheduledTrade.id}:`, {
+        triggerType: scheduledTrade.triggerType,
+        status: scheduledTrade.status,
+        scheduledTime: scheduledTrade.scheduledTime,
+        targetPriceLow: scheduledTrade.targetPriceLow,
+        targetPriceHigh: scheduledTrade.targetPriceHigh,
+        pricePercentage: scheduledTrade.pricePercentage,
+        basePriceSnapshot: scheduledTrade.basePriceSnapshot,
+      });
+
+      try {
+        const shouldTrigger = await checkScheduledTradeTrigger(scheduledTrade);
+
+        if (shouldTrigger) {
+          console.log(
+            `📺 Scheduled trade ${scheduledTrade.id} should trigger - executing...`
+          );
+          await executeScheduledTrade(scheduledTrade);
+        } else {
+          console.log(
+            `📺 Scheduled trade ${scheduledTrade.id} should not trigger yet`
+          );
+        }
+      } catch (error) {
+        console.error(
+          `❌ Error processing scheduled trade ${scheduledTrade.id}:`,
+          error
+        );
+
+        // Mark as failed
+        await storage.updateScheduledTrade(scheduledTrade.id, {
+          status: 'failed',
+          errorMessage:
+            error instanceof Error ? error.message : 'Unknown error',
+        });
+      }
+    }
+  } catch (error) {
+    console.error('❌ Error checking scheduled trades:', error);
+  }
+}
+
+async function checkScheduledTradeTrigger(
+  scheduledTrade: any
+): Promise<boolean> {
+  switch (scheduledTrade.triggerType) {
+    case 'date':
+      return checkDateTrigger(scheduledTrade);
+    case 'price_range':
+      return await checkPriceRangeTrigger(scheduledTrade);
+    case 'price_percentage':
+      return await checkPricePercentageTrigger(scheduledTrade);
+    default:
+      throw new Error(`Unknown trigger type: ${scheduledTrade.triggerType}`);
+  }
+}
+
+function checkDateTrigger(scheduledTrade: any): boolean {
+  if (!scheduledTrade.scheduledTime) {
+    console.log(
+      `📺 Scheduled trade ${scheduledTrade.id}: No scheduled time set`
+    );
+    return false;
+  }
+  const triggerDate = new Date(scheduledTrade.scheduledTime);
+  const now = new Date();
+  const shouldTrigger = now >= triggerDate;
+
+  console.log(
+    `📺 Scheduled trade ${scheduledTrade.id}: Checking date trigger`,
+    {
+      scheduledTime: scheduledTrade.scheduledTime,
+      triggerDate: triggerDate.toISOString(),
+      now: now.toISOString(),
+      shouldTrigger,
+    }
+  );
+
+  return shouldTrigger;
+}
+
+async function checkPriceRangeTrigger(scheduledTrade: any): Promise<boolean> {
+  if (!scheduledTrade.targetPriceLow || !scheduledTrade.targetPriceHigh) {
+    console.log(`📺 Scheduled trade ${scheduledTrade.id}: No price range set`);
+    return false;
+  }
+
+  const marketData = await storage.getMarketData('BTC/USD');
+  if (!marketData?.lastPrice) {
+    throw new Error('No market data available');
+  }
+
+  const currentPrice = parseFloat(marketData.lastPrice);
+  const shouldTrigger =
+    currentPrice >= scheduledTrade.targetPriceLow &&
+    currentPrice <= scheduledTrade.targetPriceHigh;
+
+  console.log(
+    `📺 Scheduled trade ${scheduledTrade.id}: Checking price range trigger`,
+    {
+      currentPrice,
+      targetPriceLow: scheduledTrade.targetPriceLow,
+      targetPriceHigh: scheduledTrade.targetPriceHigh,
+      shouldTrigger,
+    }
+  );
+
+  return shouldTrigger;
+}
+
+async function checkPricePercentageTrigger(
+  scheduledTrade: any
+): Promise<boolean> {
+  if (!scheduledTrade.pricePercentage || !scheduledTrade.basePriceSnapshot) {
+    console.log(
+      `📺 Scheduled trade ${scheduledTrade.id}: No percentage or base price set`
+    );
+    return false;
+  }
+
+  const marketData = await storage.getMarketData('BTC/USD');
+  if (!marketData?.lastPrice) {
+    throw new Error('No market data available');
+  }
+
+  const currentPrice = parseFloat(marketData.lastPrice);
+  const targetPrice =
+    scheduledTrade.basePriceSnapshot *
+    (1 + scheduledTrade.pricePercentage / 100);
+
+  let shouldTrigger;
+  if (scheduledTrade.pricePercentage > 0) {
+    // Positive percentage - trigger when price goes up
+    shouldTrigger = currentPrice >= targetPrice;
+  } else {
+    // Negative percentage - trigger when price goes down
+    shouldTrigger = currentPrice <= targetPrice;
+  }
+
+  console.log(
+    `📺 Scheduled trade ${scheduledTrade.id}: Checking percentage trigger`,
+    {
+      currentPrice,
+      basePriceSnapshot: scheduledTrade.basePriceSnapshot,
+      pricePercentage: scheduledTrade.pricePercentage,
+      targetPrice,
+      shouldTrigger,
+    }
+  );
+
+  return shouldTrigger;
+}
+
+async function executeScheduledTrade(scheduledTrade: any) {
+  console.log(`📺 Executing scheduled trade ${scheduledTrade.id}...`);
+
+  try {
+    // Get user's API credentials
+    const user = await storage.getUser(scheduledTrade.userId);
+    if (!user || !user.apiKey || !user.apiSecret || !user.apiPassphrase) {
+      throw new Error('User API credentials not configured');
+    }
+
+    const lnMarkets = createLNMarketsService({
+      apiKey: user.apiKey,
+      secret: user.apiSecret,
+      passphrase: user.apiPassphrase,
+    });
+
+    // Create the actual trade
+    const tradeData = {
+      userId: scheduledTrade.userId,
+      type: scheduledTrade.type,
+      side: scheduledTrade.side,
+      orderType: scheduledTrade.orderType,
+      status: 'open' as const,
+      margin: scheduledTrade.margin,
+      leverage: scheduledTrade.leverage,
+      quantity: scheduledTrade.quantity,
+      takeProfit: scheduledTrade.takeProfit,
+      stopLoss: scheduledTrade.stopLoss,
+      instrumentName: scheduledTrade.instrumentName,
+      settlement: scheduledTrade.settlement,
+    };
+
+    // Create trade in local storage first
+    const trade = await storage.createTrade(tradeData);
+
+    try {
+      if (scheduledTrade.type === 'futures') {
+        const lnTradeRequest = {
+          type:
+            scheduledTrade.orderType === 'market'
+              ? ('m' as const)
+              : ('l' as const),
+          side: scheduledTrade.side === 'buy' ? ('b' as const) : ('s' as const),
+          margin: scheduledTrade.margin!,
+          leverage: parseFloat(scheduledTrade.leverage!),
+          takeprofit: scheduledTrade.takeProfit
+            ? parseFloat(scheduledTrade.takeProfit)
+            : undefined,
+          stoploss: scheduledTrade.stopLoss
+            ? parseFloat(scheduledTrade.stopLoss)
+            : undefined,
+        };
+
+        const lnTrade = await lnMarkets.createFuturesTrade(lnTradeRequest);
+
+        // Update trade with LN Markets response
+        const updatedTrade = await storage.updateTrade(trade.id, {
+          lnMarketsId: lnTrade.id,
+          status: 'open',
+          entryPrice: lnTrade.price,
+          liquidationPrice: lnTrade.liquidation,
+          fee: lnTrade.fee,
+        });
+
+        if (updatedTrade) {
+          // Mark scheduled trade as triggered
+          await storage.updateScheduledTrade(scheduledTrade.id, {
+            status: 'triggered',
+            executedAt: new Date(),
+            executedTradeId: updatedTrade.id,
+          });
+
+          console.log(
+            `📺 Scheduled trade ${scheduledTrade.id} executed successfully as trade ${updatedTrade.id}`
+          );
+        }
+      } else if (scheduledTrade.type === 'options') {
+        const lnTradeRequest = {
+          side: 'b' as const,
+          quantity: parseFloat(scheduledTrade.quantity!),
+          settlement: scheduledTrade.settlement as 'physical' | 'cash',
+          instrument_name: scheduledTrade.instrumentName!,
+        };
+
+        const lnTrade = await lnMarkets.createOptionsTrade(lnTradeRequest);
+
+        const updatedTrade = await storage.updateTrade(trade.id, {
+          lnMarketsId: lnTrade.id,
+          status: 'open',
+          entryPrice: lnTrade.price,
+          fee: lnTrade.fee,
+        });
+
+        if (updatedTrade) {
+          // Mark scheduled trade as triggered
+          await storage.updateScheduledTrade(scheduledTrade.id, {
+            status: 'triggered',
+            executedAt: new Date(),
+            executedTradeId: updatedTrade.id,
+          });
+
+          console.log(
+            `📺 Scheduled trade ${scheduledTrade.id} executed successfully as trade ${updatedTrade.id}`
+          );
+        }
+      } else {
+        throw new Error('Invalid trade type');
+      }
+    } catch (lnError) {
+      // Update trade status to failed and mark scheduled trade as failed
+      await storage.updateTrade(trade.id, {
+        status: 'cancelled',
+      });
+
+      await storage.updateScheduledTrade(scheduledTrade.id, {
+        status: 'failed',
+        errorMessage:
+          lnError instanceof Error ? lnError.message : 'LN Markets error',
+      });
+
+      throw lnError;
+    }
+  } catch (error) {
+    console.error(
+      `❌ Failed to execute scheduled trade ${scheduledTrade.id}:`,
+      error
+    );
+
+    // Mark scheduled trade as failed
+    await storage.updateScheduledTrade(scheduledTrade.id, {
+      status: 'failed',
+      errorMessage: error instanceof Error ? error.message : 'Unknown error',
+    });
+
+    throw error;
+  }
+}
+
 export function startPeriodicSync() {
-  console.log('[SYNC SCHEDULER] Starting periodic sync service');
+  console.log('🔄 [SYNC SCHEDULER] Starting periodic sync service');
 
   // Run sync immediately on startup
   syncAllUserTrades();
@@ -201,7 +507,7 @@ export function startPeriodicSync() {
   syncIntervalId = setInterval(syncAllUserTrades, SYNC_INTERVAL);
 
   console.log(
-    `[SYNC SCHEDULER] Periodic sync scheduled every ${
+    `🔄 [SYNC SCHEDULER] Periodic sync scheduled every ${
       SYNC_INTERVAL / 60000
     } minutes`
   );
@@ -211,6 +517,19 @@ export function stopPeriodicSync() {
   if (syncIntervalId) {
     clearInterval(syncIntervalId);
     syncIntervalId = null;
-    console.log('[SYNC SCHEDULER] Periodic sync stopped');
+    console.log('🔄 [SYNC SCHEDULER] Periodic sync stopped');
   }
+}
+
+// Start the scheduler
+export function startScheduler() {
+  console.log('🔄 Starting scheduler...');
+
+  // Check scheduled trades every five minutes
+  setInterval(checkScheduledTrades, 5 * 60 * 1000);
+
+  // Initial check
+  checkScheduledTrades();
+
+  // ... existing sync intervals ...
 }

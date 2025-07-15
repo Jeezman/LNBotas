@@ -1,7 +1,17 @@
 import type { Express, Request, Response } from 'express';
 import { createServer, type Server } from 'http';
 import { storage } from './storage';
-import { insertTradeSchema, insertDepositSchema, validateTradeStatusTransition, updateTradeStatusSchema, type TradeStatus } from '@shared/schema';
+import {
+  insertTradeSchema,
+  insertDepositSchema,
+  validateTradeStatusTransition,
+  updateTradeStatusSchema,
+  type TradeStatus,
+  insertScheduledTradeSchema,
+  dateTriggerSchema,
+  priceRangeTriggerSchema,
+  pricePercentageTriggerSchema,
+} from '@shared/schema';
 import {
   createLNMarketsService,
   type MarketTicker,
@@ -1203,6 +1213,171 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res
         .status(500)
         .json({ message: 'Failed to sync deposits from LN Markets' });
+    }
+  });
+
+  // Scheduled trade routes
+  app.get('/api/scheduled-trades/:userId', async (req, res) => {
+    try {
+      const userId = parseInt(req.params.userId);
+      const scheduledTrades = await storage.getScheduledTradesByUserId(userId);
+      res.json(scheduledTrades);
+    } catch (error) {
+      console.error('Error fetching scheduled trades:', error);
+      res.status(500).json({ message: 'Failed to fetch scheduled trades' });
+    }
+  });
+
+  app.post('/api/scheduled-trades', async (req, res) => {
+    try {
+      const validatedData = insertScheduledTradeSchema.parse(req.body);
+
+      // Validate and process trigger data based on trigger type
+      let scheduledTradeData = { ...validatedData };
+
+      try {
+        switch (validatedData.triggerType) {
+          case 'date':
+            if (!req.body.triggerValue) {
+              return res.status(400).json({
+                message: 'Date and time is required for date trigger',
+              });
+            }
+            const dateTime = new Date(req.body.triggerValue);
+            if (isNaN(dateTime.getTime())) {
+              return res.status(400).json({
+                message: 'Invalid date format',
+              });
+            }
+            scheduledTradeData.scheduledTime = dateTime;
+            break;
+          case 'price_range':
+            if (!req.body.triggerValue) {
+              return res.status(400).json({
+                message: 'Price range is required',
+              });
+            }
+            const [minPrice, maxPrice] = req.body.triggerValue
+              .split('-')
+              .map((p: string) => parseFloat(p.trim()));
+            if (isNaN(minPrice) || isNaN(maxPrice) || minPrice >= maxPrice) {
+              return res.status(400).json({
+                message:
+                  'Invalid price range. Use format: min - max (e.g., 115000 - 116000)',
+              });
+            }
+            scheduledTradeData.targetPriceLow = minPrice.toString();
+            scheduledTradeData.targetPriceHigh = maxPrice.toString();
+            break;
+          case 'price_percentage':
+            if (!req.body.triggerValue) {
+              return res.status(400).json({
+                message: 'Percentage is required',
+              });
+            }
+            const percentage = parseFloat(req.body.triggerValue);
+            if (isNaN(percentage)) {
+              return res.status(400).json({
+                message: 'Invalid percentage. Use format: +5 or -5',
+              });
+            }
+            scheduledTradeData.pricePercentage = percentage.toString();
+
+            // Get current market price for basePriceSnapshot
+            const marketData = await storage.getMarketData('BTC/USD');
+            if (!marketData?.lastPrice) {
+              return res.status(400).json({
+                message: 'No market data available for percentage trigger',
+              });
+            }
+            scheduledTradeData.basePriceSnapshot = parseFloat(
+              marketData.lastPrice
+            ).toString();
+            break;
+          default:
+            return res.status(400).json({
+              message: 'Invalid trigger type',
+            });
+        }
+      } catch (parseError) {
+        return res.status(400).json({
+          message: 'Invalid trigger value format',
+          error:
+            parseError instanceof Error ? parseError.message : 'Unknown error',
+        });
+      }
+
+      // Create scheduled trade
+      const scheduledTrade = await storage.createScheduledTrade(
+        scheduledTradeData
+      );
+      res.json(scheduledTrade);
+    } catch (error) {
+      console.error('Error creating scheduled trade:', error);
+      if (error instanceof z.ZodError) {
+        res.status(400).json({
+          message: 'Invalid scheduled trade data',
+          errors: error.errors,
+        });
+      } else {
+        res.status(500).json({ message: 'Failed to create scheduled trade' });
+      }
+    }
+  });
+
+  app.put('/api/scheduled-trades/:id', async (req, res) => {
+    try {
+      const scheduledTradeId = parseInt(req.params.id);
+      const updates = req.body;
+
+      const scheduledTrade = await storage.getScheduledTrade(scheduledTradeId);
+      if (!scheduledTrade) {
+        return res.status(404).json({ message: 'Scheduled trade not found' });
+      }
+
+      // Only allow updates if the scheduled trade is still pending
+      if (scheduledTrade.status !== 'pending') {
+        return res.status(400).json({
+          message: 'Cannot update scheduled trade that is not pending',
+        });
+      }
+
+      const updatedScheduledTrade = await storage.updateScheduledTrade(
+        scheduledTradeId,
+        updates
+      );
+      res.json(updatedScheduledTrade);
+    } catch (error) {
+      console.error('Error updating scheduled trade:', error);
+      res.status(500).json({ message: 'Failed to update scheduled trade' });
+    }
+  });
+
+  app.delete('/api/scheduled-trades/:id', async (req, res) => {
+    try {
+      const scheduledTradeId = parseInt(req.params.id);
+
+      const scheduledTrade = await storage.getScheduledTrade(scheduledTradeId);
+      if (!scheduledTrade) {
+        return res.status(404).json({ message: 'Scheduled trade not found' });
+      }
+
+      // Only allow deletion if the scheduled trade is still pending
+      if (scheduledTrade.status !== 'pending') {
+        return res.status(400).json({
+          message: 'Cannot delete scheduled trade that is not pending',
+        });
+      }
+
+      const deleted = await storage.deleteScheduledTrade(scheduledTradeId);
+      if (deleted) {
+        res.json({ message: 'Scheduled trade deleted successfully' });
+      } else {
+        res.status(404).json({ message: 'Scheduled trade not found' });
+      }
+    } catch (error) {
+      console.error('Error deleting scheduled trade:', error);
+      res.status(500).json({ message: 'Failed to delete scheduled trade' });
     }
   });
 

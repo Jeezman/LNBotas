@@ -1,6 +1,22 @@
-import { users, trades, marketData, deposits, type User, type InsertUser, type Trade, type InsertTrade, type MarketData, type InsertMarketData, type Deposit, type InsertDeposit } from "@shared/schema";
-import { db } from "./db";
-import { eq, and, or } from "drizzle-orm";
+import {
+  users,
+  trades,
+  marketData,
+  deposits,
+  scheduledTrades,
+  type User,
+  type InsertUser,
+  type Trade,
+  type InsertTrade,
+  type MarketData,
+  type InsertMarketData,
+  type Deposit,
+  type InsertDeposit,
+  type ScheduledTrade,
+  type InsertScheduledTrade,
+} from '@shared/schema';
+import { db } from './db';
+import { eq, and, or } from 'drizzle-orm';
 
 export interface IStorage {
   // User operations
@@ -19,6 +35,19 @@ export interface IStorage {
   updateTrade(id: number, updates: Partial<Trade>): Promise<Trade | undefined>;
   deleteTrade(id: number): Promise<boolean>;
 
+  // Scheduled trade operations
+  getScheduledTrade(id: number): Promise<ScheduledTrade | undefined>;
+  getScheduledTradesByUserId(userId: number): Promise<ScheduledTrade[]>;
+  getPendingScheduledTrades(): Promise<ScheduledTrade[]>;
+  createScheduledTrade(
+    scheduledTrade: InsertScheduledTrade
+  ): Promise<ScheduledTrade>;
+  updateScheduledTrade(
+    id: number,
+    updates: Partial<ScheduledTrade>
+  ): Promise<ScheduledTrade | undefined>;
+  deleteScheduledTrade(id: number): Promise<boolean>;
+
   // Market data operations
   getMarketData(symbol: string): Promise<MarketData | undefined>;
   updateMarketData(data: InsertMarketData): Promise<MarketData>;
@@ -29,30 +58,37 @@ export interface IStorage {
   getDepositsByUserId(userId: number): Promise<Deposit[]>;
   getDepositByAddress(address: string): Promise<Deposit | undefined>;
   createDeposit(deposit: InsertDeposit): Promise<Deposit>;
-  updateDeposit(id: number, updates: Partial<Deposit>): Promise<Deposit | undefined>;
+  updateDeposit(
+    id: number,
+    updates: Partial<Deposit>
+  ): Promise<Deposit | undefined>;
   deleteDeposit(id: number): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
   private users: Map<number, User>;
   private trades: Map<number, Trade>;
+  private scheduledTrades: Map<number, ScheduledTrade>;
   private marketData: Map<string, MarketData>;
   private deposits: Map<number, Deposit>;
   private currentUserId: number;
   private currentTradeId: number;
+  private currentScheduledTradeId: number;
   private currentMarketDataId: number;
   private currentDepositId: number;
 
   constructor() {
     this.users = new Map();
     this.trades = new Map();
+    this.scheduledTrades = new Map();
     this.marketData = new Map();
     this.deposits = new Map();
     this.currentUserId = 1;
     this.currentTradeId = 1;
+    this.currentScheduledTradeId = 1;
     this.currentMarketDataId = 1;
     this.currentDepositId = 1;
-    
+
     // Create demo user
     this.createDemoUser();
   }
@@ -72,14 +108,13 @@ export class MemStorage implements IStorage {
     this.currentUserId = 2; // Start next user ID from 2
   }
 
-
   async getUser(id: number): Promise<User | undefined> {
     return this.users.get(id);
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
     return Array.from(this.users.values()).find(
-      (user) => user.username === username,
+      (user) => user.username === username
     );
   }
 
@@ -89,8 +124,8 @@ export class MemStorage implements IStorage {
 
   async createUser(insertUser: InsertUser): Promise<User> {
     const id = this.currentUserId++;
-    const user: User = { 
-      ...insertUser, 
+    const user: User = {
+      ...insertUser,
       id,
       apiKey: insertUser.apiKey || null,
       apiSecret: insertUser.apiSecret || null,
@@ -102,10 +137,13 @@ export class MemStorage implements IStorage {
     return user;
   }
 
-  async updateUser(id: number, updates: Partial<User>): Promise<User | undefined> {
+  async updateUser(
+    id: number,
+    updates: Partial<User>
+  ): Promise<User | undefined> {
     const user = this.users.get(id);
     if (!user) return undefined;
-    
+
     const updatedUser = { ...user, ...updates };
     this.users.set(id, updatedUser);
     return updatedUser;
@@ -121,13 +159,15 @@ export class MemStorage implements IStorage {
 
   async getTradesByUserId(userId: number): Promise<Trade[]> {
     return Array.from(this.trades.values()).filter(
-      (trade) => trade.userId === userId,
+      (trade) => trade.userId === userId
     );
   }
 
   async getActiveTradesByUserId(userId: number): Promise<Trade[]> {
     return Array.from(this.trades.values()).filter(
-      (trade) => trade.userId === userId && (trade.status === 'open' || trade.status === 'running'),
+      (trade) =>
+        trade.userId === userId &&
+        (trade.status === 'open' || trade.status === 'running')
     );
   }
 
@@ -162,14 +202,17 @@ export class MemStorage implements IStorage {
     return trade;
   }
 
-  async updateTrade(id: number, updates: Partial<Trade>): Promise<Trade | undefined> {
+  async updateTrade(
+    id: number,
+    updates: Partial<Trade>
+  ): Promise<Trade | undefined> {
     const trade = this.trades.get(id);
     if (!trade) return undefined;
-    
-    const updatedTrade = { 
-      ...trade, 
-      ...updates, 
-      updatedAt: new Date() 
+
+    const updatedTrade = {
+      ...trade,
+      ...updates,
+      updatedAt: new Date(),
     };
     this.trades.set(id, updatedTrade);
     return updatedTrade;
@@ -177,6 +220,74 @@ export class MemStorage implements IStorage {
 
   async deleteTrade(id: number): Promise<boolean> {
     return this.trades.delete(id);
+  }
+
+  // Scheduled trade operations
+  async getScheduledTrade(id: number): Promise<ScheduledTrade | undefined> {
+    return this.scheduledTrades.get(id);
+  }
+
+  async getScheduledTradesByUserId(userId: number): Promise<ScheduledTrade[]> {
+    return Array.from(this.scheduledTrades.values()).filter(
+      (scheduledTrade) => scheduledTrade.userId === userId
+    );
+  }
+
+  async getPendingScheduledTrades(): Promise<ScheduledTrade[]> {
+    return Array.from(this.scheduledTrades.values()).filter(
+      (scheduledTrade) => scheduledTrade.status === 'pending'
+    );
+  }
+
+  async createScheduledTrade(
+    insertScheduledTrade: InsertScheduledTrade
+  ): Promise<ScheduledTrade> {
+    const id = this.currentScheduledTradeId++;
+    const scheduledTrade: ScheduledTrade = {
+      ...insertScheduledTrade,
+      id,
+      userId: insertScheduledTrade.userId,
+      triggerType: insertScheduledTrade.triggerType,
+      triggerValue: insertScheduledTrade.triggerValue,
+      type: insertScheduledTrade.type,
+      side: insertScheduledTrade.side,
+      orderType: insertScheduledTrade.orderType,
+      margin: insertScheduledTrade.margin || null,
+      leverage: insertScheduledTrade.leverage || null,
+      quantity: insertScheduledTrade.quantity || null,
+      takeProfit: insertScheduledTrade.takeProfit || null,
+      stopLoss: insertScheduledTrade.stopLoss || null,
+      instrumentName: insertScheduledTrade.instrumentName || null,
+      settlement: insertScheduledTrade.settlement || null,
+      status: 'pending',
+      triggeredAt: null,
+      executedTradeId: null,
+      errorMessage: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.scheduledTrades.set(id, scheduledTrade);
+    return scheduledTrade;
+  }
+
+  async updateScheduledTrade(
+    id: number,
+    updates: Partial<ScheduledTrade>
+  ): Promise<ScheduledTrade | undefined> {
+    const scheduledTrade = this.scheduledTrades.get(id);
+    if (!scheduledTrade) return undefined;
+
+    const updatedScheduledTrade = {
+      ...scheduledTrade,
+      ...updates,
+      updatedAt: new Date(),
+    };
+    this.scheduledTrades.set(id, updatedScheduledTrade);
+    return updatedScheduledTrade;
+  }
+
+  async deleteScheduledTrade(id: number): Promise<boolean> {
+    return this.scheduledTrades.delete(id);
   }
 
   async getMarketData(symbol: string): Promise<MarketData | undefined> {
@@ -223,13 +334,13 @@ export class MemStorage implements IStorage {
 
   async getDepositsByUserId(userId: number): Promise<Deposit[]> {
     return Array.from(this.deposits.values()).filter(
-      (deposit) => deposit.userId === userId,
+      (deposit) => deposit.userId === userId
     );
   }
 
   async getDepositByAddress(address: string): Promise<Deposit | undefined> {
     return Array.from(this.deposits.values()).find(
-      (deposit) => deposit.address === address,
+      (deposit) => deposit.address === address
     );
   }
 
@@ -253,14 +364,17 @@ export class MemStorage implements IStorage {
     return deposit;
   }
 
-  async updateDeposit(id: number, updates: Partial<Deposit>): Promise<Deposit | undefined> {
+  async updateDeposit(
+    id: number,
+    updates: Partial<Deposit>
+  ): Promise<Deposit | undefined> {
     const deposit = this.deposits.get(id);
     if (!deposit) return undefined;
-    
-    const updatedDeposit = { 
-      ...deposit, 
-      ...updates, 
-      updatedAt: new Date() 
+
+    const updatedDeposit = {
+      ...deposit,
+      ...updates,
+      updatedAt: new Date(),
     };
     this.deposits.set(id, updatedDeposit);
     return updatedDeposit;
@@ -278,7 +392,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.username, username));
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(eq(users.username, username));
     return user || undefined;
   }
 
@@ -287,14 +404,14 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
-    const [user] = await db
-      .insert(users)
-      .values(insertUser)
-      .returning();
+    const [user] = await db.insert(users).values(insertUser).returning();
     return user;
   }
 
-  async updateUser(id: number, updates: Partial<User>): Promise<User | undefined> {
+  async updateUser(
+    id: number,
+    updates: Partial<User>
+  ): Promise<User | undefined> {
     const [user] = await db
       .update(users)
       .set(updates)
@@ -318,12 +435,15 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getActiveTradesByUserId(userId: number): Promise<Trade[]> {
-    return db.select().from(trades).where(
-      and(
-        eq(trades.userId, userId), 
-        or(eq(trades.status, 'open'), eq(trades.status, 'running'))
-      )
-    );
+    return db
+      .select()
+      .from(trades)
+      .where(
+        and(
+          eq(trades.userId, userId),
+          or(eq(trades.status, 'open'), eq(trades.status, 'running'))
+        )
+      );
   }
 
   async createTrade(insertTrade: InsertTrade): Promise<Trade> {
@@ -337,7 +457,10 @@ export class DatabaseStorage implements IStorage {
     return trade;
   }
 
-  async updateTrade(id: number, updates: Partial<Trade>): Promise<Trade | undefined> {
+  async updateTrade(
+    id: number,
+    updates: Partial<Trade>
+  ): Promise<Trade | undefined> {
     const [trade] = await db
       .update(trades)
       .set(updates)
@@ -351,15 +474,79 @@ export class DatabaseStorage implements IStorage {
     return (result.rowCount || 0) > 0;
   }
 
+  // Scheduled trade operations
+  async getScheduledTrade(id: number): Promise<ScheduledTrade | undefined> {
+    const [scheduledTrade] = await db
+      .select()
+      .from(scheduledTrades)
+      .where(eq(scheduledTrades.id, id));
+    return scheduledTrade || undefined;
+  }
+
+  async getScheduledTradesByUserId(userId: number): Promise<ScheduledTrade[]> {
+    return db
+      .select()
+      .from(scheduledTrades)
+      .where(eq(scheduledTrades.userId, userId));
+  }
+
+  async getPendingScheduledTrades(): Promise<ScheduledTrade[]> {
+    return db
+      .select()
+      .from(scheduledTrades)
+      .where(eq(scheduledTrades.status, 'pending'));
+  }
+
+  async createScheduledTrade(
+    insertScheduledTrade: InsertScheduledTrade
+  ): Promise<ScheduledTrade> {
+    const [scheduledTrade] = await db
+      .insert(scheduledTrades)
+      .values({
+        ...insertScheduledTrade,
+        status: 'pending',
+        triggeredAt: null,
+        executedTradeId: null,
+        errorMessage: null,
+      })
+      .returning();
+    return scheduledTrade;
+  }
+
+  async updateScheduledTrade(
+    id: number,
+    updates: Partial<ScheduledTrade>
+  ): Promise<ScheduledTrade | undefined> {
+    const [scheduledTrade] = await db
+      .update(scheduledTrades)
+      .set({
+        ...updates,
+        updatedAt: new Date(),
+      })
+      .where(eq(scheduledTrades.id, id))
+      .returning();
+    return scheduledTrade || undefined;
+  }
+
+  async deleteScheduledTrade(id: number): Promise<boolean> {
+    const result = await db
+      .delete(scheduledTrades)
+      .where(eq(scheduledTrades.id, id));
+    return (result.rowCount || 0) > 0;
+  }
+
   async getMarketData(symbol: string): Promise<MarketData | undefined> {
-    const [data] = await db.select().from(marketData).where(eq(marketData.symbol, symbol));
+    const [data] = await db
+      .select()
+      .from(marketData)
+      .where(eq(marketData.symbol, symbol));
     return data || undefined;
   }
 
   async updateMarketData(data: InsertMarketData): Promise<MarketData> {
     // Check if market data already exists
     const existing = await this.getMarketData(data.symbol);
-    
+
     if (existing) {
       // Update existing record
       const [updated] = await db
@@ -373,10 +560,7 @@ export class DatabaseStorage implements IStorage {
       return updated;
     } else {
       // Insert new record
-      const [inserted] = await db
-        .insert(marketData)
-        .values(data)
-        .returning();
+      const [inserted] = await db.insert(marketData).values(data).returning();
       return inserted;
     }
   }
@@ -384,7 +568,9 @@ export class DatabaseStorage implements IStorage {
   async clearMarketData(symbol?: string): Promise<boolean> {
     if (symbol) {
       // Clear specific symbol
-      const result = await db.delete(marketData).where(eq(marketData.symbol, symbol));
+      const result = await db
+        .delete(marketData)
+        .where(eq(marketData.symbol, symbol));
       return (result.rowCount || 0) > 0;
     } else {
       // Clear all market data
@@ -395,7 +581,10 @@ export class DatabaseStorage implements IStorage {
 
   // Deposit operations
   async getDeposit(id: number): Promise<Deposit | undefined> {
-    const [deposit] = await db.select().from(deposits).where(eq(deposits.id, id));
+    const [deposit] = await db
+      .select()
+      .from(deposits)
+      .where(eq(deposits.id, id));
     return deposit || undefined;
   }
 
@@ -404,7 +593,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getDepositByAddress(address: string): Promise<Deposit | undefined> {
-    const [deposit] = await db.select().from(deposits).where(eq(deposits.address, address));
+    const [deposit] = await db
+      .select()
+      .from(deposits)
+      .where(eq(deposits.address, address));
     return deposit || undefined;
   }
 
@@ -420,7 +612,10 @@ export class DatabaseStorage implements IStorage {
     return deposit;
   }
 
-  async updateDeposit(id: number, updates: Partial<Deposit>): Promise<Deposit | undefined> {
+  async updateDeposit(
+    id: number,
+    updates: Partial<Deposit>
+  ): Promise<Deposit | undefined> {
     const [deposit] = await db
       .update(deposits)
       .set({

@@ -4,6 +4,8 @@ import { ActivePositions } from '@/components/trading/active-positions';
 import { TradingForm } from '@/components/trading/trading-form';
 import { MarketInfo } from '@/components/trading/market-info';
 import { QuickActions } from '@/components/trading/quick-actions';
+import { ScheduledTrades } from '@/components/trading/scheduled-trades';
+import { ScheduledTradeForm } from '@/components/trading/scheduled-trade-form';
 import { SettingsContent } from '@/components/settings/settings-content';
 import { useUser, useUpdateMarketData } from '@/hooks/use-trading';
 import { useEffect } from 'react';
@@ -22,11 +24,13 @@ function DashboardContent() {
         {/* Trading Panel */}
         <div className="xl:col-span-2 space-y-6">
           <ActivePositions />
+          <ScheduledTrades />
         </div>
 
         {/* Trading Form */}
         <div className="space-y-6">
           <TradingForm />
+          <ScheduledTradeForm />
           <MarketInfo />
           <QuickActions />
         </div>

@@ -3,7 +3,8 @@ import express, { type Request, Response, NextFunction } from 'express';
 import { registerRoutes } from './routes';
 import { setupVite, serveStatic, log } from './vite';
 import { initializeDatabase } from './init-db';
-import { startPeriodicSync } from './services/sync-scheduler';
+import { startPeriodicSync, startScheduler } from './services/sync-scheduler';
+import { storage } from './storage';
 
 const app = express();
 app.use(express.json());
@@ -59,7 +60,10 @@ app.use((req, res, next) => {
     throw err;
   });
 
-  // Start periodic sync for trade positions
+  // Start the scheduler for scheduled trades
+  startScheduler();
+
+  // Start periodic sync
   startPeriodicSync();
 
   // Serve the app on port 5001 for development
