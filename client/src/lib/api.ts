@@ -24,6 +24,7 @@ export interface Trade {
   status: string;
   entryPrice: string | null;
   exitPrice: string | null;
+  limitPrice: string | null;
   margin: number | null;
   leverage: string | null;
   quantity: string | null;
@@ -97,8 +98,10 @@ export interface TradeRequest {
   type: 'futures' | 'options';
   side: 'buy' | 'sell';
   orderType: 'market' | 'limit';
+  status: 'open' | 'running' | 'closed' | 'cancelled';
   margin?: number;
   leverage?: string;
+  limitPrice?: string;
   quantity?: string;
   takeProfit?: string;
   stopLoss?: string;

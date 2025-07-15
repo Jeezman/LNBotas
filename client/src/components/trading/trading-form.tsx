@@ -17,11 +17,20 @@ const tradeFormSchema = z.object({
   side: z.enum(['buy', 'sell']),
   margin: z.string().min(1, "Margin is required"),
   leverage: z.string().min(1, "Leverage is required"),
+  limitPrice: z.string().optional(),
   takeProfit: z.string().optional(),
   stopLoss: z.string().optional(),
   quantity: z.string().optional(),
   instrumentName: z.string().optional(),
   settlement: z.enum(['physical', 'cash']).optional(),
+}).refine((data) => {
+  if (data.orderType === 'limit' && (!data.limitPrice || data.limitPrice.trim() === '')) {
+    return false;
+  }
+  return true;
+}, {
+  message: "Limit price is required for limit orders",
+  path: ["limitPrice"],
 });
 
 type TradeFormValues = z.infer<typeof tradeFormSchema>;
@@ -41,18 +50,23 @@ export function TradingForm() {
       side: 'buy',
       margin: '',
       leverage: '10',
+      limitPrice: '',
       takeProfit: '',
       stopLoss: '',
     },
   });
 
   const onSubmit = (values: TradeFormValues) => {
+    const status = values.orderType === 'market' ? 'running' : 'open';
+    
     createTrade.mutate({
       type: values.type,
       side: values.side,
       orderType: values.orderType,
+      status,
       margin: parseInt(values.margin),
       leverage: values.leverage,
+      limitPrice: values.limitPrice || undefined,
       takeProfit: values.takeProfit || undefined,
       stopLoss: values.stopLoss || undefined,
       quantity: values.quantity || undefined,
@@ -64,6 +78,7 @@ export function TradingForm() {
   const currentPrice = marketData?.lastPrice ? parseFloat(marketData.lastPrice) : 0;
   const margin = form.watch('margin');
   const leverage = form.watch('leverage');
+  const orderType = form.watch('orderType');
   
   const positionSize = margin && leverage && currentPrice > 0 ? 
     (parseInt(margin) * parseFloat(leverage) / currentPrice / 100000000).toFixed(6) : '0.000000';
@@ -129,6 +144,27 @@ export function TradingForm() {
                 </FormItem>
               )}
             />
+
+            {/* Limit Price - only show when order type is limit */}
+            {orderType === 'limit' && (
+              <FormField
+                control={form.control}
+                name="limitPrice"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Limit Price ($)</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        placeholder={currentPrice > 0 ? currentPrice.toFixed(2) : "45000"}
+                        className="font-mono"
+                        {...field}
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+            )}
 
             {/* Side */}
             <div>

@@ -54,6 +54,7 @@ export const trades = pgTable('trades', {
   status: text('status').notNull(), // 'open' | 'running' | 'closed' | 'cancelled'
   entryPrice: decimal('entry_price', { precision: 18, scale: 2 }),
   exitPrice: decimal('exit_price', { precision: 18, scale: 2 }),
+  limitPrice: decimal('limit_price', { precision: 18, scale: 2 }),
   margin: integer('margin'), // in satoshis
   leverage: decimal('leverage', { precision: 5, scale: 2 }),
   quantity: decimal('quantity', { precision: 18, scale: 8 }),
