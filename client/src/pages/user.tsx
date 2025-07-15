@@ -1,4 +1,4 @@
-import { useUser, useDeposits, useGenerateDeposit, useSyncDeposits, useCheckDepositStatus } from "@/hooks/use-trading";
+import { useUser, useDeposits, useGenerateDeposit, useSyncDeposits, useCheckDepositStatus, useSyncBalance } from "@/hooks/use-trading";
 import { useAuth } from "@/hooks/use-auth";
 import type { Deposit } from "@shared/schema";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -34,6 +34,7 @@ export default function UserPage() {
   const { data: deposits = [], refetch: refetchDeposits } = useDeposits(authUser?.id);
   const generateDeposit = useGenerateDeposit(authUser?.id);
   const syncDeposits = useSyncDeposits(authUser?.id);
+  const syncBalance = useSyncBalance(authUser?.id);
   const checkDepositStatus = useCheckDepositStatus();
   const { toast } = useToast();
   
@@ -135,9 +136,20 @@ export default function UserPage() {
                 <Bitcoin className="h-4 w-4" />
                 Bitcoin Balance
               </Label>
-              <span className="font-mono text-sm">
-                ₿{user.balance ? parseFloat(user.balance).toLocaleString() : "0"}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="font-mono text-sm">
+                  ₿{user.balance ? parseFloat(user.balance).toLocaleString() : "0"}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => syncBalance.mutate()}
+                  disabled={syncBalance.isPending}
+                  className="h-6 w-6 p-0"
+                >
+                  <RefreshCw className={`h-3 w-3 ${syncBalance.isPending ? 'animate-spin' : ''}`} />
+                </Button>
+              </div>
             </div>
             
             <div className="flex items-center justify-between">

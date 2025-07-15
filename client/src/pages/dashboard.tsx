@@ -7,10 +7,10 @@ import { QuickActions } from '@/components/trading/quick-actions';
 import { ScheduledTrades } from '@/components/trading/scheduled-trades';
 import { ScheduledTradeForm } from '@/components/trading/scheduled-trade-form';
 import { SettingsContent } from '@/components/settings/settings-content';
-import { useUser, useUpdateMarketData } from '@/hooks/use-trading';
+import { useUser, useUpdateMarketData, useSyncBalance } from '@/hooks/use-trading';
 import { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Plus } from 'lucide-react';
+import { Plus, RefreshCw } from 'lucide-react';
 import { useLocation } from 'wouter';
 import UserPage from './user';
 import FuturesPage from './futures';
@@ -53,6 +53,7 @@ function PlaceholderPage({ title }: { title: string }) {
 export default function Dashboard() {
   const { data: user } = useUser();
   const updateMarketData = useUpdateMarketData();
+  const syncBalance = useSyncBalance();
   const [location] = useLocation();
 
   // Update market data on component mount and periodically
@@ -145,6 +146,15 @@ export default function Dashboard() {
                       : '$0.00'}
                   </p>
                 </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => syncBalance.mutate()}
+                  disabled={syncBalance.isPending}
+                  className="text-gray-600 hover:text-gray-900"
+                >
+                  <RefreshCw className={`w-4 h-4 ${syncBalance.isPending ? 'animate-spin' : ''}`} />
+                </Button>
               </div>
 
               {location === '/' && (

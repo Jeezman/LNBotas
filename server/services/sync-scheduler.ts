@@ -7,6 +7,41 @@ const SYNC_INTERVAL = 5 * 60 * 1000;
 
 let syncIntervalId: NodeJS.Timeout | null = null;
 
+async function syncUserBalance(userId: number): Promise<void> {
+  try {
+    const user = await storage.getUser(userId);
+    if (!user || !user.apiKey || !user.apiSecret || !user.apiPassphrase) {
+      return;
+    }
+
+    const lnMarkets = createLNMarketsService({
+      apiKey: user.apiKey,
+      secret: user.apiSecret,
+      passphrase: user.apiPassphrase,
+    });
+
+    const balance = await lnMarkets.getBalance();
+
+    // Get current market data for USD conversion
+    const marketData = await storage.getMarketData('BTC/USD');
+    const btcPrice = marketData?.lastPrice
+      ? parseFloat(marketData.lastPrice)
+      : 0;
+
+    await storage.updateUser(userId, {
+      balance: balance.balance,
+      balanceUSD:
+        btcPrice > 0
+          ? (parseFloat(balance.balance) * 0.00000001 * btcPrice).toString()
+          : '0.00',
+    });
+
+    console.log(`[SYNC SCHEDULER] Balance synced for user ${userId}: ${balance.balance} BTC`);
+  } catch (error) {
+    console.error(`[SYNC SCHEDULER] Failed to sync balance for user ${userId}:`, error);
+  }
+}
+
 async function syncAllUserTrades() {
   console.log('[SYNC SCHEDULER] Starting periodic trade sync for all users');
 
@@ -171,6 +206,9 @@ async function syncAllUserTrades() {
             optionsError
           );
         }
+
+        // Sync balance for this user
+        await syncUserBalance(user.id);
 
         totalSynced += userSynced;
         totalUpdated += userUpdated;

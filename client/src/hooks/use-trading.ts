@@ -230,6 +230,44 @@ export function useUpdateUserCredentials(userId?: string | number) {
   });
 }
 
+export function useSyncBalance(userId?: string | number) {
+  const { toast } = useToast();
+  const { user: authUser, setUser } = useAuth();
+  const userIdParam = userId || authUser?.id;
+
+  return useMutation({
+    mutationFn: async () => {
+      if (!userIdParam) throw new Error('User ID is required');
+
+      const response = await apiRequest('POST', `/api/user/${userIdParam}/sync-balance`);
+      return response.json();
+    },
+    onSuccess: (data) => {
+      // Update the auth context with fresh balance data
+      if (authUser && data) {
+        const updatedUser = {
+          ...authUser,
+          balance: data.balance || authUser.balance,
+          balanceUSD: data.balanceUSD || authUser.balanceUSD,
+        };
+        setUser(updatedUser);
+      }
+
+      toast({
+        title: 'Balance Synced',
+        description: 'Your balance has been synchronized with LN Markets.',
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Sync Failed',
+        description: error.message || 'Failed to sync balance',
+        variant: 'destructive',
+      });
+    },
+  });
+}
+
 export function useSyncTrades(
   userId?: string | number,
   tradeType: 'open' | 'running' | 'closed' | 'all' = 'all'

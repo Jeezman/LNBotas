@@ -48,6 +48,41 @@ function logSuccess(req: Request, action: string, result?: any) {
   );
 }
 
+async function syncUserBalance(userId: number): Promise<void> {
+  try {
+    const user = await storage.getUser(userId);
+    if (!user || !user.apiKey || !user.apiSecret || !user.apiPassphrase) {
+      return;
+    }
+
+    const lnMarkets = createLNMarketsService({
+      apiKey: user.apiKey,
+      secret: user.apiSecret,
+      passphrase: user.apiPassphrase,
+    });
+
+    const balance = await lnMarkets.getBalance();
+
+    // Get current market data for USD conversion
+    const marketData = await storage.getMarketData('BTC/USD');
+    const btcPrice = marketData?.lastPrice
+      ? parseFloat(marketData.lastPrice)
+      : 0;
+
+    await storage.updateUser(userId, {
+      balance: balance.balance,
+      balanceUSD:
+        btcPrice > 0
+          ? (parseFloat(balance.balance) * 0.00000001 * btcPrice).toString()
+          : '0.00',
+    });
+
+    console.log(`Balance synced for user ${userId}: ${balance.balance} BTC`);
+  } catch (error) {
+    console.error(`Failed to sync balance for user ${userId}:`, error);
+  }
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Market data endpoints
   app.get('/api/market/ticker', async (req, res) => {
@@ -451,6 +486,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error updating credentials:', error);
       res.status(500).json({ message: 'Failed to update credentials' });
+    }
+  });
+
+  // Balance sync endpoint
+  app.post('/api/user/:id/sync-balance', async (req, res) => {
+    try {
+      const userId = parseInt(req.params.id);
+      const user = await storage.getUser(userId);
+
+      if (!user) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+
+      if (!user.apiKey || !user.apiSecret || !user.apiPassphrase) {
+        return res.status(400).json({ 
+          message: 'User API credentials not configured' 
+        });
+      }
+
+      const lnMarkets = createLNMarketsService({
+        apiKey: user.apiKey,
+        secret: user.apiSecret,
+        passphrase: user.apiPassphrase,
+      });
+
+      const balance = await lnMarkets.getBalance();
+
+      // Get current market data for USD conversion
+      const marketData = await storage.getMarketData('BTC/USD');
+      const btcPrice = marketData?.lastPrice
+        ? parseFloat(marketData.lastPrice)
+        : 0;
+
+      await storage.updateUser(userId, {
+        balance: balance.balance,
+        balanceUSD:
+          btcPrice > 0
+            ? (parseFloat(balance.balance) * 0.00000001 * btcPrice).toString()
+            : '0.00',
+      });
+
+      // Return updated user data
+      const updatedUser = await storage.getUser(userId);
+      res.json(updatedUser);
+    } catch (error: any) {
+      console.error('Error syncing balance:', error);
+      res.status(500).json({ 
+        message: 'Failed to sync balance',
+        detail: error.message || 'Balance sync failed'
+      });
     }
   });
 
@@ -910,6 +995,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         logError(req, 'Error fetching options trades', optionsError);
       }
 
+      // Sync balance after trade sync
+      await syncUserBalance(userId);
+
       const result = {
         message: `${
           tradeType.charAt(0).toUpperCase() + tradeType.slice(1)
@@ -1198,6 +1286,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           syncedCount++;
         }
       }
+
+      // Sync balance after deposit sync
+      await syncUserBalance(userId);
 
       const result = {
         message: 'Deposits synced successfully',

@@ -76,8 +76,8 @@ export function ActivePositions() {
   };
 
   const getSideBadgeClassName = (side: string) => {
-    return side === 'buy' 
-      ? 'bg-green-600 text-white hover:bg-green-700' 
+    return side === 'buy'
+      ? 'bg-green-600 text-white hover:bg-green-700'
       : 'bg-red-600 text-white hover:bg-red-700';
   };
 
@@ -196,7 +196,6 @@ export function ActivePositions() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Type</TableHead>
                   <TableHead>Side</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Entry Price</TableHead>
@@ -210,15 +209,6 @@ export function ActivePositions() {
                   <TableRow key={trade.id}>
                     <TableCell>
                       <Badge
-                        variant={
-                          trade.type === 'futures' ? 'default' : 'secondary'
-                        }
-                      >
-                        {trade.type}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge 
                         variant={getSideBadgeVariant(trade.side)}
                         className={getSideBadgeClassName(trade.side)}
                       >
@@ -238,11 +228,12 @@ export function ActivePositions() {
                             : 'bg-gray-600 text-white'
                         }
                       >
-                        {trade.status === 'running' 
-                          ? 'Running' 
+                        {trade.status === 'running'
+                          ? 'Running'
                           : trade.status === 'open'
                           ? 'Open'
-                          : trade.status.charAt(0).toUpperCase() + trade.status.slice(1)}
+                          : trade.status.charAt(0).toUpperCase() +
+                            trade.status.slice(1)}
                       </Badge>
                     </TableCell>
                     <TableCell className="font-mono text-sm">
@@ -256,16 +247,19 @@ export function ActivePositions() {
                         : 'N/A'}
                     </TableCell>
                     <TableCell>
-                      {trade.pnlUSD ? (
+                      {trade.pnl ? (
                         <span
                           className={`font-mono text-sm ${
-                            parseFloat(trade.pnlUSD) >= 0
-                              ? 'text-success'
-                              : 'text-danger'
+                            parseFloat(trade.pnl) >= 0
+                              ? 'text-green-600'
+                              : 'text-red-600'
                           }`}
                         >
-                          {parseFloat(trade.pnlUSD) >= 0 ? '+' : ''}$
-                          {parseFloat(trade.pnlUSD).toFixed(2)}
+                          {parseFloat(trade.pnl) >= 0 ? '+' : ''}
+                          {parseFloat(trade.pnl).toLocaleString('en-US', {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}
                         </span>
                       ) : (
                         <span className="font-mono text-sm text-gray-500">
