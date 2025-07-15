@@ -20,6 +20,27 @@ export function ScheduledTrades() {
   const { data: scheduledTrades = [], isLoading } = useScheduledTrades();
   const deleteScheduledTrade = useDeleteScheduledTrade();
 
+  // Sort scheduled trades to show pending tasks first
+  const sortedScheduledTrades = [...scheduledTrades].sort((a, b) => {
+    // Priority order: pending, triggered, cancelled, failed
+    const statusOrder = {
+      pending: 0,
+      triggered: 1,
+      cancelled: 2,
+      failed: 3
+    };
+    
+    const aOrder = statusOrder[a.status as keyof typeof statusOrder] ?? 4;
+    const bOrder = statusOrder[b.status as keyof typeof statusOrder] ?? 4;
+    
+    if (aOrder !== bOrder) {
+      return aOrder - bOrder;
+    }
+    
+    // If same status, sort by creation date (newest first)
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  });
+
   const handleDeleteScheduledTrade = (scheduledTradeId: number) => {
     if (confirm('Are you sure you want to delete this scheduled trade?')) {
       deleteScheduledTrade.mutate(scheduledTradeId);
@@ -77,7 +98,7 @@ export function ScheduledTrades() {
   const getStatusBadgeVariant = (status: string) => {
     switch (status) {
       case 'pending':
-        return 'default';
+        return 'secondary';
       case 'triggered':
         return 'default';
       case 'cancelled':
@@ -86,6 +107,21 @@ export function ScheduledTrades() {
         return 'destructive';
       default:
         return 'outline';
+    }
+  };
+
+  const getStatusBadgeClassName = (status: string) => {
+    switch (status) {
+      case 'pending':
+        return 'bg-orange-600 text-white hover:bg-orange-700';
+      case 'triggered':
+        return 'bg-green-600 text-white hover:bg-green-700';
+      case 'cancelled':
+        return 'bg-gray-600 text-white hover:bg-gray-700';
+      case 'failed':
+        return 'bg-red-600 text-white hover:bg-red-700';
+      default:
+        return '';
     }
   };
 
@@ -127,7 +163,7 @@ export function ScheduledTrades() {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        {scheduledTrades.length === 0 ? (
+        {sortedScheduledTrades.length === 0 ? (
           <div className="text-center py-8 text-gray-500">
             <Clock className="h-12 w-12 mx-auto mb-4 text-gray-300" />
             <p>No scheduled trades yet</p>
@@ -137,7 +173,7 @@ export function ScheduledTrades() {
           </div>
         ) : (
           <div className="space-y-4">
-            {scheduledTrades.map((scheduledTrade) => (
+            {sortedScheduledTrades.map((scheduledTrade) => (
               <div
                 key={scheduledTrade.id}
                 className="border rounded-lg p-4 hover:bg-gray-50 transition-colors"
@@ -153,6 +189,7 @@ export function ScheduledTrades() {
                       </span>
                       <Badge
                         variant={getStatusBadgeVariant(scheduledTrade.status)}
+                        className={getStatusBadgeClassName(scheduledTrade.status)}
                       >
                         {scheduledTrade.status}
                       </Badge>
