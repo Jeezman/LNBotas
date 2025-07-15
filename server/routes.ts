@@ -735,12 +735,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (tradeType === 'all') {
         // Fetch all trade types
-        const [openTrades, runningTrades] = await Promise.all([
+        const [openTrades, runningTrades, closedTrades] = await Promise.all([
           lnMarketsService.getFuturesTrades('open'),
           lnMarketsService.getFuturesTrades('running'),
-          // lnMarketsService.getFuturesTrades('closed')
+          lnMarketsService.getFuturesTrades('closed'),
         ]);
-        futuresTrades = [...openTrades, ...runningTrades];
+        futuresTrades = [...openTrades, ...runningTrades, ...closedTrades];
       } else {
         // Fetch specific trade type
         futuresTrades = await lnMarketsService.getFuturesTrades(
