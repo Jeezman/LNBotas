@@ -539,6 +539,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // User full info endpoint
+  app.get('/api/user/:id/full-info', async (req, res) => {
+    try {
+      const userId = parseInt(req.params.id);
+      const user = await storage.getUser(userId);
+
+      if (!user) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+
+      if (!user.apiKey || !user.apiSecret || !user.apiPassphrase) {
+        return res.status(400).json({ 
+          message: 'User API credentials not configured' 
+        });
+      }
+
+      const lnMarkets = createLNMarketsService({
+        apiKey: user.apiKey,
+        secret: user.apiSecret,
+        passphrase: user.apiPassphrase,
+      });
+
+      const userInfo = await lnMarkets.getUserInfo();
+
+      // Return user info with database fields merged
+      const fullUserInfo = {
+        ...user,
+        uid: userInfo.uid,
+        synthetic_usd_balance: userInfo.synthetic_usd_balance,
+        use_taproot_addresses: userInfo.use_taproot_addresses,
+        auto_withdraw_enabled: userInfo.auto_withdraw_enabled,
+        auto_withdraw_lightning_address: userInfo.auto_withdraw_lightning_address,
+        linkingpublickey: userInfo.linkingpublickey,
+        role: userInfo.role,
+        email: userInfo.email,
+        email_confirmed: userInfo.email_confirmed,
+        show_leaderboard: userInfo.show_leaderboard,
+        account_type: userInfo.account_type,
+        totp_enabled: userInfo.totp_enabled,
+        webauthn_enabled: userInfo.webauthn_enabled,
+        fee_tier: userInfo.fee_tier
+      };
+
+      res.json(fullUserInfo);
+    } catch (error: any) {
+      console.error('Error fetching user full info:', error);
+      res.status(500).json({ 
+        message: 'Failed to fetch user information',
+        detail: error.message || 'User info fetch failed'
+      });
+    }
+  });
+
   // Trade endpoints
   app.get('/api/trades/:userId', async (req, res) => {
     try {

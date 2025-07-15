@@ -1,4 +1,4 @@
-import { useUser, useDeposits, useGenerateDeposit, useSyncDeposits, useCheckDepositStatus, useSyncBalance } from "@/hooks/use-trading";
+import { useUser, useUserFullInfo, useDeposits, useGenerateDeposit, useSyncDeposits, useCheckDepositStatus, useSyncBalance } from "@/hooks/use-trading";
 import { useAuth } from "@/hooks/use-auth";
 import type { Deposit } from "@shared/schema";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,7 +12,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useState } from "react";
-import { User, Bitcoin, DollarSign, Copy, QrCode, Download, RefreshCw } from "lucide-react";
+import { User, Bitcoin, DollarSign, Copy, QrCode, Download, RefreshCw, Hash, Settings, Zap, Mail, Key, Send } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { DepositModal } from "@/components/deposit-modal";
 
@@ -31,6 +31,7 @@ type DepositFormValues = z.infer<typeof depositFormSchema>;
 export default function UserPage() {
   const { user: authUser } = useAuth();
   const { data: user, isLoading } = useUser(authUser?.id);
+  const { data: userFullInfo, isLoading: isLoadingFullInfo } = useUserFullInfo(authUser?.id);
   const { data: deposits = [], refetch: refetchDeposits } = useDeposits(authUser?.id);
   const generateDeposit = useGenerateDeposit(authUser?.id);
   const syncDeposits = useSyncDeposits(authUser?.id);
@@ -40,6 +41,19 @@ export default function UserPage() {
   
   const [selectedDeposit, setSelectedDeposit] = useState<Deposit | null>(null);
   const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
+
+  const copyToClipboard = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    toast({
+      title: "Copied!",
+      description: `${label} copied to clipboard`,
+    });
+  };
+
+  const truncateText = (text: string, maxLength: number = 20) => {
+    if (text.length <= maxLength) return text;
+    return `${text.substring(0, maxLength)}...`;
+  };
   
   const depositForm = useForm<DepositFormValues>({
     resolver: zodResolver(depositFormSchema),
@@ -170,6 +184,134 @@ export default function UserPage() {
                 {user.apiKey ? "Connected" : "Not Connected"}
               </Badge>
             </div>
+            
+            {userFullInfo && (
+              <>
+                <Separator />
+                
+                {/* User ID */}
+                <div className="flex items-center justify-between">
+                  <Label className="flex items-center gap-2">
+                    <Hash className="h-4 w-4" />
+                    User ID
+                  </Label>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-sm text-gray-600">
+                      {truncateText(userFullInfo.uid || 'N/A', 16)}
+                    </span>
+                    {userFullInfo.uid && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => copyToClipboard(userFullInfo.uid!, 'User ID')}
+                        className="h-6 w-6 p-0"
+                      >
+                        <Copy className="h-3 w-3" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+                
+                {/* Synthetic USD Balance */}
+                <div className="flex items-center justify-between">
+                  <Label className="flex items-center gap-2">
+                    <DollarSign className="h-4 w-4" />
+                    Synthetic USD Balance
+                  </Label>
+                  <span className="font-mono text-sm">
+                    ${userFullInfo.synthetic_usd_balance?.toLocaleString('en-US', {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2
+                    }) || '0.00'}
+                  </span>
+                </div>
+                
+                <Separator />
+                
+                {/* Taproot Addresses */}
+                <div className="flex items-center justify-between">
+                  <Label className="flex items-center gap-2">
+                    <Settings className="h-4 w-4" />
+                    Taproot Addresses
+                  </Label>
+                  <Badge variant={userFullInfo.use_taproot_addresses ? "default" : "secondary"}>
+                    {userFullInfo.use_taproot_addresses ? "Enabled" : "Disabled"}
+                  </Badge>
+                </div>
+                
+                {/* Auto Withdraw */}
+                <div className="flex items-center justify-between">
+                  <Label className="flex items-center gap-2">
+                    <Zap className="h-4 w-4" />
+                    Auto Withdraw
+                  </Label>
+                  <Badge variant={userFullInfo.auto_withdraw_enabled ? "default" : "secondary"}>
+                    {userFullInfo.auto_withdraw_enabled ? "Enabled" : "Disabled"}
+                  </Badge>
+                </div>
+                
+                {/* Auto Withdraw Lightning Address */}
+                <div className="flex items-center justify-between">
+                  <Label className="flex items-center gap-2">
+                    <Send className="h-4 w-4" />
+                    Auto Withdraw Address
+                  </Label>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-sm text-gray-600">
+                      {userFullInfo.auto_withdraw_lightning_address 
+                        ? truncateText(userFullInfo.auto_withdraw_lightning_address, 20)
+                        : 'Not Set'}
+                    </span>
+                    {userFullInfo.auto_withdraw_lightning_address && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => copyToClipboard(userFullInfo.auto_withdraw_lightning_address!, 'Lightning Address')}
+                        className="h-6 w-6 p-0"
+                      >
+                        <Copy className="h-3 w-3" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+                
+                <Separator />
+                
+                {/* Linking Public Key */}
+                <div className="flex items-center justify-between">
+                  <Label className="flex items-center gap-2">
+                    <Key className="h-4 w-4" />
+                    Linking Public Key
+                  </Label>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-sm text-gray-600">
+                      {userFullInfo.linkingpublickey 
+                        ? truncateText(userFullInfo.linkingpublickey, 20)
+                        : 'N/A'}
+                    </span>
+                    {userFullInfo.linkingpublickey && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => copyToClipboard(userFullInfo.linkingpublickey!, 'Public Key')}
+                        className="h-6 w-6 p-0"
+                      >
+                        <Copy className="h-3 w-3" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
+            
+            {isLoadingFullInfo && (
+              <>
+                <Separator />
+                <div className="flex items-center justify-center py-4">
+                  <span className="text-sm text-gray-500">Loading extended user info...</span>
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
 

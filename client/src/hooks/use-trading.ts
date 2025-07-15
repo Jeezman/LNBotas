@@ -40,6 +40,28 @@ export function useUser(userId?: string | number) {
   });
 }
 
+export function useUserFullInfo(userId?: string | number) {
+  const { user: authUser } = useAuth();
+  const userIdParam = userId || authUser?.id;
+
+  return useQuery<User>({
+    queryKey: ['/api/user', userIdParam, 'full-info'],
+    queryFn: async () => {
+      if (!userIdParam) throw new Error('User ID is required');
+      return api.getUserFullInfo(Number(userIdParam));
+    },
+    enabled: !!userIdParam, // Only run query if we have a user ID
+    staleTime: 5 * 60 * 1000, // Consider data stale after 5 minutes
+    retry: (failureCount, error) => {
+      // Don't retry if user credentials are not configured
+      if (error instanceof Error && error.message.includes('credentials not configured')) {
+        return false;
+      }
+      return failureCount < 3;
+    },
+  });
+}
+
 export function useActiveTrades(userId?: string | number) {
   const { user: authUser } = useAuth();
   const userIdParam = userId || authUser?.id;

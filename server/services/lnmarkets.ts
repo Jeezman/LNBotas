@@ -70,9 +70,23 @@ export interface LNMarketsTrade {
 }
 
 export interface UserInfo {
-  balance: string;
-  account_type: string;
+  uid: string;
+  role: string;
+  balance: number;
   username: string;
+  login: string | null;
+  synthetic_usd_balance: number;
+  linkingpublickey: string;
+  show_leaderboard: boolean;
+  email: string;
+  email_confirmed: boolean;
+  use_taproot_addresses: boolean;
+  account_type: string;
+  auto_withdraw_enabled: boolean;
+  auto_withdraw_lightning_address: string | null;
+  totp_enabled: boolean;
+  webauthn_enabled: boolean;
+  fee_tier: number;
 }
 
 export interface DepositRequest {
@@ -104,7 +118,8 @@ export class LNMarketsService {
 
   async getBalance(): Promise<{ balance: string }> {
     const userInfo = await this.client.userGet();
-    return { balance: userInfo.balance };
+    console.log('LN Markets userInfo:', userInfo);
+    return { balance: userInfo.balance.toString() };
   }
 
   // Futures operations

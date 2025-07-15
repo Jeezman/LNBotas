@@ -75,6 +75,21 @@ export interface User {
   apiKey: string | null;
   balance: string | null;
   balanceUSD: string | null;
+  // LN Markets extended fields
+  uid?: string;
+  synthetic_usd_balance?: number;
+  use_taproot_addresses?: boolean;
+  auto_withdraw_enabled?: boolean;
+  auto_withdraw_lightning_address?: string | null;
+  linkingpublickey?: string;
+  role?: string;
+  email?: string;
+  email_confirmed?: boolean;
+  show_leaderboard?: boolean;
+  account_type?: string;
+  totp_enabled?: boolean;
+  webauthn_enabled?: boolean;
+  fee_tier?: number;
 }
 
 export interface TradeRequest {
@@ -123,6 +138,11 @@ export const api = {
   // User operations
   getUser: async (userId: number): Promise<User> => {
     const response = await apiRequest('GET', `/api/user/${userId}`);
+    return response.json();
+  },
+
+  getUserFullInfo: async (userId: number): Promise<User> => {
+    const response = await apiRequest('GET', `/api/user/${userId}/full-info`);
     return response.json();
   },
 
