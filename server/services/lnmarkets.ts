@@ -141,7 +141,8 @@ export class LNMarketsService {
   }
 
   async closeFuturesTrade(id: string): Promise<any> {
-    return this.client.futuresCloseTrade({ id });
+    // Use the dedicated library method for closing futures trades
+    return this.client.futuresCloseTrade(id);
   }
 
   async closeAllFuturesTrades(): Promise<any> {
@@ -150,6 +151,11 @@ export class LNMarketsService {
 
   async cancelAllFuturesOrders(): Promise<any> {
     return this.client.futuresCancelAllTrades();
+  }
+
+  async cancelFuturesOrder(id: string): Promise<any> {
+    // Use the dedicated library method for cancelling individual futures orders
+    return this.client.futuresCancelTrade(id);
   }
 
   // Options operations

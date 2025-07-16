@@ -777,17 +777,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
 
         if (trade.type === 'futures') {
-          await lnMarkets.closeFuturesTrade(trade.lnMarketsId);
+          if (trade.status === 'running') {
+            // Close running position
+            await lnMarkets.closeFuturesTrade(trade.lnMarketsId);
+          } else if (trade.status === 'open') {
+            // Cancel open order (limit order)
+            await lnMarkets.cancelFuturesOrder(trade.lnMarketsId);
+          }
         } else {
           await lnMarkets.closeOptionsTrade(trade.lnMarketsId);
         }
       }
 
+      // Update status based on the original trade status
+      const newStatus = trade.status === 'open' ? 'cancelled' : 'closed';
       await storage.updateTrade(tradeId, {
-        status: 'closed',
+        status: newStatus,
       });
 
-      res.json({ message: 'Trade closed successfully' });
+      const message = trade.status === 'open' 
+        ? 'Order cancelled successfully'
+        : 'Trade closed successfully';
+      
+      res.json({ message });
     } catch (error) {
       console.error('Error closing trade:', error);
       res.status(500).json({ message: 'Failed to close trade' });
@@ -825,6 +837,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error closing all trades:', error);
       res.status(500).json({ message: 'Failed to close all trades' });
+    }
+  });
+
+  app.delete('/api/trades/:userId/cancel-all-orders', async (req, res) => {
+    try {
+      const userId = parseInt(req.params.userId);
+
+      const user = await storage.getUser(userId);
+      if (!user || !user.apiKey || !user.apiSecret || !user.apiPassphrase) {
+        return res
+          .status(400)
+          .json({ message: 'User API credentials not configured' });
+      }
+
+      const lnMarkets = createLNMarketsService({
+        apiKey: user.apiKey,
+        secret: user.apiSecret,
+        passphrase: user.apiPassphrase,
+      });
+
+      await lnMarkets.cancelAllFuturesOrders();
+
+      // Update all open orders to cancelled
+      const activeTrades = await storage.getActiveTradesByUserId(userId);
+      await Promise.all(
+        activeTrades
+          .filter(trade => trade.status === 'open')
+          .map((trade) =>
+            storage.updateTrade(trade.id, { status: 'cancelled' })
+          )
+      );
+
+      res.json({ message: 'All open orders cancelled successfully' });
+    } catch (error) {
+      console.error('Error cancelling all orders:', error);
+      res.status(500).json({ message: 'Failed to cancel all orders' });
     }
   });
 

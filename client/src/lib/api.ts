@@ -198,6 +198,14 @@ export const api = {
     return response.json();
   },
 
+  cancelAllOrders: async (userId: number) => {
+    const response = await apiRequest(
+      'DELETE',
+      `/api/trades/${userId}/cancel-all-orders`
+    );
+    return response.json();
+  },
+
   // Scheduled trade operations
   getScheduledTrades: async (userId: number): Promise<ScheduledTrade[]> => {
     const response = await apiRequest('GET', `/api/scheduled-trades/${userId}`);

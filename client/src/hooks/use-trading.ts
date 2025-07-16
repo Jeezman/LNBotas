@@ -190,6 +190,35 @@ export function useCloseAllTrades() {
   });
 }
 
+export function useCancelAllOrders() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const { user: authUser } = useAuth();
+
+  return useMutation({
+    mutationFn: () => {
+      if (!authUser?.id) {
+        throw new Error('No user ID available for cancelling orders');
+      }
+      return api.cancelAllOrders(Number(authUser.id));
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/trades'] });
+      toast({
+        title: 'All Orders Cancelled',
+        description: 'All your open orders have been cancelled successfully.',
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Cancel All Failed',
+        description: error.message || 'Failed to cancel all orders',
+        variant: 'destructive',
+      });
+    },
+  });
+}
+
 export function useUpdateMarketData() {
   const queryClient = useQueryClient();
 

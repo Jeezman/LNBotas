@@ -21,18 +21,28 @@ import {
   useActiveTrades,
   useCloseTrade,
   useCloseAllTrades,
+  useCancelAllOrders,
   useSyncTrades,
 } from '@/hooks/use-trading';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Edit, X, RefreshCw, Filter } from 'lucide-react';
+import { CloseTradeModal } from './close-trade-modal';
+import { CloseAllTradesModal } from './close-all-trades-modal';
+import type { Trade } from '@/lib/api';
 
 type TradeStatusFilter = 'all' | 'open' | 'running' | 'closed';
 
 export function ActivePositions() {
   const [statusFilter, setStatusFilter] = useState<TradeStatusFilter>('all');
+  const [selectedTrade, setSelectedTrade] = useState<Trade | null>(null);
+  const [isCloseTradeModalOpen, setIsCloseTradeModalOpen] = useState(false);
+  const [isCloseAllModalOpen, setIsCloseAllModalOpen] = useState(false);
+  const [closeAllModalType, setCloseAllModalType] = useState<'close-all' | 'cancel-orders'>('close-all');
+  
   const { data: trades = [], isLoading } = useActiveTrades();
   const closeTrade = useCloseTrade();
   const closeAllTrades = useCloseAllTrades();
+  const cancelAllOrders = useCancelAllOrders();
 
   // Create individual sync hooks for different trade types
   const syncOpenTrades = useSyncTrades(undefined, 'open');
@@ -63,12 +73,42 @@ export function ActivePositions() {
     return trade.status === statusFilter;
   });
 
-  const handleCloseTrade = (tradeId: number) => {
-    closeTrade.mutate(tradeId);
+  const handleCloseTradeClick = (trade: Trade) => {
+    setSelectedTrade(trade);
+    setIsCloseTradeModalOpen(true);
   };
 
-  const handleCloseAll = () => {
-    closeAllTrades.mutate();
+  const handleCloseTradeConfirm = () => {
+    if (selectedTrade) {
+      closeTrade.mutate(selectedTrade.id, {
+        onSettled: () => {
+          setIsCloseTradeModalOpen(false);
+          setSelectedTrade(null);
+        },
+      });
+    }
+  };
+
+  const handleCloseAllClick = () => {
+    setCloseAllModalType('close-all');
+    setIsCloseAllModalOpen(true);
+  };
+
+  const handleCancelAllOrdersClick = () => {
+    setCloseAllModalType('cancel-orders');
+    setIsCloseAllModalOpen(true);
+  };
+
+  const handleCloseAllConfirm = () => {
+    if (closeAllModalType === 'close-all') {
+      closeAllTrades.mutate(undefined, {
+        onSettled: () => setIsCloseAllModalOpen(false),
+      });
+    } else {
+      cancelAllOrders.mutate(undefined, {
+        onSettled: () => setIsCloseAllModalOpen(false),
+      });
+    }
   };
 
   const getSideBadgeVariant = (side: string) => {
@@ -162,14 +202,26 @@ export function ActivePositions() {
               />
               All
             </Button>
-            {filteredTrades.length > 0 && (
+            {filteredTrades.filter(trade => trade.status === 'running').length > 0 && (
               <Button
                 variant="outline"
                 size="sm"
-                onClick={handleCloseAll}
+                onClick={handleCloseAllClick}
                 disabled={closeAllTrades.isPending}
+                title="Close all running positions"
               >
                 Close All
+              </Button>
+            )}
+            {filteredTrades.filter(trade => trade.status === 'open').length > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleCancelAllOrdersClick}
+                disabled={cancelAllOrders.isPending}
+                title="Cancel all open orders"
+              >
+                Cancel Orders
               </Button>
             )}
           </div>
@@ -272,14 +324,36 @@ export function ActivePositions() {
                         <Button variant="ghost" size="sm">
                           <Edit className="h-4 w-4" />
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleCloseTrade(trade.id)}
-                          disabled={closeTrade.isPending}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
+                        {trade.status === 'running' ? (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleCloseTradeClick(trade)}
+                            disabled={closeTrade.isPending}
+                            title="Close position"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        ) : trade.status === 'open' ? (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleCloseTradeClick(trade)}
+                            disabled={closeTrade.isPending}
+                            title="Cancel order"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        ) : (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            disabled
+                            title="Cannot close closed trade"
+                          >
+                            <X className="h-4 w-4 opacity-50" />
+                          </Button>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -289,6 +363,27 @@ export function ActivePositions() {
           </div>
         )}
       </CardContent>
+
+      {/* Confirmation Modals */}
+      <CloseTradeModal
+        trade={selectedTrade}
+        isOpen={isCloseTradeModalOpen}
+        onClose={() => {
+          setIsCloseTradeModalOpen(false);
+          setSelectedTrade(null);
+        }}
+        onConfirm={handleCloseTradeConfirm}
+        isLoading={closeTrade.isPending}
+      />
+
+      <CloseAllTradesModal
+        trades={filteredTrades}
+        type={closeAllModalType}
+        isOpen={isCloseAllModalOpen}
+        onClose={() => setIsCloseAllModalOpen(false)}
+        onConfirm={handleCloseAllConfirm}
+        isLoading={closeAllModalType === 'close-all' ? closeAllTrades.isPending : cancelAllOrders.isPending}
+      />
     </Card>
   );
 }
