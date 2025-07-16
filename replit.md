@@ -35,6 +35,15 @@ Preferred communication style: Simple, everyday language.
   - Frontend hooks for deposit management with React Query integration
   - User interface for creating deposits and viewing deposit history with status badges
   - Real-time deposit address generation using {"amount": satoshis} payload structure as requested
+- **Deposit Status Checking & Sync**: Added real-time deposit status verification functionality (July 2025)
+  - Implemented individual deposit status checking via POST /api/deposits/:depositId/check endpoint
+  - Added useCheckDepositStatus() React hook with toast notifications for status updates
+  - Created sync deposits functionality that fetches all deposit history from LN Markets API
+  - Successfully synced 48 real deposits from LN Markets with proper status mapping (completed/failed)
+  - Added check status button (refresh icon) next to each deposit for manual status verification
+  - Implemented green badge styling for completed deposits using custom Tailwind classes
+  - Fixed database constraint issues for deposit synchronization with LN Markets payment hashes
+  - Added automatic database updates when checking individual deposit status from LN Markets
 
 ## System Architecture
 

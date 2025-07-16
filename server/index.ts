@@ -1,10 +1,10 @@
-import 'dotenv/config';
-import express, { type Request, Response, NextFunction } from 'express';
-import { registerRoutes } from './routes';
-import { setupVite, serveStatic, log } from './vite';
-import { initializeDatabase } from './init-db';
-import { startPeriodicSync, startScheduler } from './services/sync-scheduler';
-import { storage } from './storage';
+import "dotenv/config";
+import express, { type Request, Response, NextFunction } from "express";
+import { registerRoutes } from "./routes";
+import { setupVite, serveStatic, log } from "./vite";
+import { initializeDatabase } from "./init-db";
+import { startPeriodicSync, startScheduler } from "./services/sync-scheduler";
+import { storage } from "./storage";
 
 const app = express();
 app.use(express.json());
@@ -21,9 +21,9 @@ app.use((req, res, next) => {
     return originalResJson.apply(res, [bodyJson, ...args]);
   };
 
-  res.on('finish', () => {
+  res.on("finish", () => {
     const duration = Date.now() - start;
-    if (path.startsWith('/api')) {
+    if (path.startsWith("/api")) {
       let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
       if (capturedJsonResponse) {
         const responseStr = JSON.stringify(capturedJsonResponse);
@@ -46,7 +46,7 @@ app.use((req, res, next) => {
   // doesn't interfere with the other routes
   const server = await registerRoutes(app);
 
-  if (process.env.NODE_ENV === 'development') {
+  if (process.env.NODE_ENV === "development") {
     await setupVite(app, server);
   } else {
     serveStatic(app);
@@ -54,7 +54,7 @@ app.use((req, res, next) => {
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
-    const message = err.message || 'Internal Server Error';
+    const message = err.message || "Internal Server Error";
 
     res.status(status).json({ message });
     throw err;
@@ -68,15 +68,15 @@ app.use((req, res, next) => {
 
   // Serve the app on port 5001 for development
   // this serves both the API and the client.
-  const port = process.env.PORT || 5001;
+  const port = process.env.PORT || 5000;
   server.listen(
     {
       port,
-      host: '0.0.0.0',
+      host: "0.0.0.0",
       reusePort: true,
     },
     () => {
       log(`serving on port ${port}`);
-    }
+    },
   );
 })();
