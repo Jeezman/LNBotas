@@ -130,7 +130,8 @@ export class LNMarketsService {
   async getFuturesTrades(
     type: 'open' | 'closed' | 'running' = 'open'
   ): Promise<LNMarketsTrade[]> {
-    return this.client.futuresGetTrades({ type, from: 1714633904 });
+    // return this.client.futuresGetTrades({ type, from: 1714633904 });
+    return this.client.futuresGetTrades({ type, from: 1751299710 });
   }
 
   async updateFuturesTrade(
@@ -176,11 +177,11 @@ export class LNMarketsService {
     try {
       // Try different method names that might be available
       if (this.client.futuresCancelTrade) {
-        const result = await this.client.futuresCancelTrade({ id });
+        const result = await this.client.futuresCancelTrade(id);
         console.log('Futures order cancel result:', result);
         return result;
       } else if (this.client.futuresCancelOrder) {
-        const result = await this.client.futuresCancelOrder({ id });
+        const result = await this.client.futuresCancelOrder(id);
         console.log('Futures order cancel result:', result);
         return result;
       } else {
