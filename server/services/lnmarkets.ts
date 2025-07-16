@@ -142,7 +142,24 @@ export class LNMarketsService {
 
   async closeFuturesTrade(id: string): Promise<any> {
     // Use the dedicated library method for closing futures trades
-    return this.client.futuresCloseTrade(id);
+    console.log('Closing futures trade with ID:', id);
+    try {
+      // Try different method names that might be available
+      if (this.client.futuresCloseTrade) {
+        const result = await this.client.futuresCloseTrade({ id });
+        console.log('Futures trade close result:', result);
+        return result;
+      } else if (this.client.futuresClosePosition) {
+        const result = await this.client.futuresClosePosition({ id });
+        console.log('Futures position close result:', result);
+        return result;
+      } else {
+        throw new Error('No suitable method found for closing futures trades');
+      }
+    } catch (error) {
+      console.error('Error closing futures trade:', error);
+      throw error;
+    }
   }
 
   async closeAllFuturesTrades(): Promise<any> {
@@ -155,7 +172,26 @@ export class LNMarketsService {
 
   async cancelFuturesOrder(id: string): Promise<any> {
     // Use the dedicated library method for cancelling individual futures orders
-    return this.client.futuresCancelTrade(id);
+    console.log('Cancelling futures order with ID:', id);
+    try {
+      // Try different method names that might be available
+      if (this.client.futuresCancelTrade) {
+        const result = await this.client.futuresCancelTrade({ id });
+        console.log('Futures order cancel result:', result);
+        return result;
+      } else if (this.client.futuresCancelOrder) {
+        const result = await this.client.futuresCancelOrder({ id });
+        console.log('Futures order cancel result:', result);
+        return result;
+      } else {
+        throw new Error(
+          'No suitable method found for cancelling futures orders'
+        );
+      }
+    } catch (error) {
+      console.error('Error cancelling futures order:', error);
+      throw error;
+    }
   }
 
   // Options operations

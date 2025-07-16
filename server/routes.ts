@@ -500,8 +500,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       if (!user.apiKey || !user.apiSecret || !user.apiPassphrase) {
-        return res.status(400).json({ 
-          message: 'User API credentials not configured' 
+        return res.status(400).json({
+          message: 'User API credentials not configured',
         });
       }
 
@@ -532,9 +532,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(updatedUser);
     } catch (error: any) {
       console.error('Error syncing balance:', error);
-      res.status(500).json({ 
+      res.status(500).json({
         message: 'Failed to sync balance',
-        detail: error.message || 'Balance sync failed'
+        detail: error.message || 'Balance sync failed',
       });
     }
   });
@@ -550,8 +550,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       if (!user.apiKey || !user.apiSecret || !user.apiPassphrase) {
-        return res.status(400).json({ 
-          message: 'User API credentials not configured' 
+        return res.status(400).json({
+          message: 'User API credentials not configured',
         });
       }
 
@@ -570,7 +570,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         synthetic_usd_balance: userInfo.synthetic_usd_balance,
         use_taproot_addresses: userInfo.use_taproot_addresses,
         auto_withdraw_enabled: userInfo.auto_withdraw_enabled,
-        auto_withdraw_lightning_address: userInfo.auto_withdraw_lightning_address,
+        auto_withdraw_lightning_address:
+          userInfo.auto_withdraw_lightning_address,
         linkingpublickey: userInfo.linkingpublickey,
         role: userInfo.role,
         email: userInfo.email,
@@ -579,15 +580,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         account_type: userInfo.account_type,
         totp_enabled: userInfo.totp_enabled,
         webauthn_enabled: userInfo.webauthn_enabled,
-        fee_tier: userInfo.fee_tier
+        fee_tier: userInfo.fee_tier,
       };
 
       res.json(fullUserInfo);
     } catch (error: any) {
       console.error('Error fetching user full info:', error);
-      res.status(500).json({ 
+      res.status(500).json({
         message: 'Failed to fetch user information',
-        detail: error.message || 'User info fetch failed'
+        detail: error.message || 'User info fetch failed',
       });
     }
   });
@@ -653,9 +654,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             stoploss: validatedData.stopLoss
               ? parseFloat(validatedData.stopLoss)
               : undefined,
-            price: validatedData.orderType === 'limit' && validatedData.limitPrice
-              ? parseFloat(validatedData.limitPrice)
-              : undefined,
+            price:
+              validatedData.orderType === 'limit' && validatedData.limitPrice
+                ? parseFloat(validatedData.limitPrice)
+                : undefined,
           };
 
           const lnTrade = await lnMarkets.createFuturesTrade(lnTradeRequest);
@@ -756,18 +758,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete('/api/trades/:id', async (req, res) => {
     try {
       const tradeId = parseInt(req.params.id);
+      logRequest(req, 'Closing trade', { tradeId });
 
       const trade = await storage.getTrade(tradeId);
       if (!trade) {
+        logError(
+          req,
+          'Trade not found',
+          new Error(`Trade ${tradeId} not found`)
+        );
         return res.status(404).json({ message: 'Trade not found' });
       }
 
+      logRequest(req, 'Trade found', { trade });
+
       const user = await storage.getUser(trade.userId);
       if (!user || !user.apiKey || !user.apiSecret || !user.apiPassphrase) {
+        logError(
+          req,
+          'User API credentials not configured',
+          new Error('Missing API credentials')
+        );
         return res
           .status(400)
           .json({ message: 'User API credentials not configured' });
       }
+
+      logRequest(req, 'User credentials found', { userId: user.id });
 
       if (trade.lnMarketsId) {
         const lnMarkets = createLNMarketsService({
@@ -776,17 +793,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
           passphrase: user.apiPassphrase,
         });
 
+        logRequest(req, 'Calling LN Markets API', {
+          tradeId: trade.lnMarketsId,
+          type: trade.type,
+          status: trade.status,
+        });
+
         if (trade.type === 'futures') {
           if (trade.status === 'running') {
             // Close running position
+            logRequest(req, 'Closing futures trade', {
+              tradeId: trade.lnMarketsId,
+            });
             await lnMarkets.closeFuturesTrade(trade.lnMarketsId);
+            logSuccess(req, 'Futures trade closed successfully');
           } else if (trade.status === 'open') {
             // Cancel open order (limit order)
+            logRequest(req, 'Cancelling futures order', {
+              tradeId: trade.lnMarketsId,
+            });
             await lnMarkets.cancelFuturesOrder(trade.lnMarketsId);
+            logSuccess(req, 'Futures order cancelled successfully');
           }
         } else {
+          logRequest(req, 'Closing options trade', {
+            tradeId: trade.lnMarketsId,
+          });
           await lnMarkets.closeOptionsTrade(trade.lnMarketsId);
+          logSuccess(req, 'Options trade closed successfully');
         }
+      } else {
+        logRequest(req, 'No LN Markets ID found, skipping API call');
       }
 
       // Update status based on the original trade status
@@ -795,14 +832,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status: newStatus,
       });
 
-      const message = trade.status === 'open' 
-        ? 'Order cancelled successfully'
-        : 'Trade closed successfully';
-      
+      const message =
+        trade.status === 'open'
+          ? 'Order cancelled successfully'
+          : 'Trade closed successfully';
+
+      logSuccess(req, 'Trade status updated in database', { newStatus });
       res.json({ message });
     } catch (error) {
+      logError(req, 'Error closing trade', error);
       console.error('Error closing trade:', error);
-      res.status(500).json({ message: 'Failed to close trade' });
+      res.status(500).json({
+        message: 'Failed to close trade',
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
     }
   });
 
@@ -863,7 +906,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const activeTrades = await storage.getActiveTradesByUserId(userId);
       await Promise.all(
         activeTrades
-          .filter(trade => trade.status === 'open')
+          .filter((trade) => trade.status === 'open')
           .map((trade) =>
             storage.updateTrade(trade.id, { status: 'cancelled' })
           )
