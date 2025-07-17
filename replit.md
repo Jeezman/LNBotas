@@ -53,7 +53,7 @@ Preferred communication style: Simple, everyday language.
 - **Database**: PostgreSQL with Drizzle ORM (Database implementation active)
 - **Database Provider**: PostgreSQL with connection pooling
 - **API Pattern**: RESTful API with Express routes
-- **LN Markets Integration**: Official @ln-markets/api package
+- **LN Markets Integration**: Direct REST API integration with custom signature generation
 - **Session Management**: In-memory sessions for development
 
 ### Key Components

@@ -21,7 +21,7 @@ LN Markets Trading Dashboard is a full-stack Bitcoin derivatives trading applica
 - **Location**: `server/`
 - **Runtime**: Node.js with Express.js (TypeScript + ES modules)
 - **Database**: PostgreSQL with Drizzle ORM
-- **External API**: LN Markets integration via `@ln-markets/api`
+- **External API**: LN Markets integration via direct REST API calls
 - **Authentication**: bcrypt password hashing with 12 salt rounds
 
 ### Database Schema (`shared/schema.ts`)

@@ -770,7 +770,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'Trade not found' });
       }
 
-      logRequest(req, 'Trade found', { trade });
+      logRequest(req, 'Trade found', { 
+        tradeId: trade.id,
+        lnMarketsId: trade.lnMarketsId,
+        type: trade.type,
+        status: trade.status,
+        fullTrade: trade 
+      });
 
       const user = await storage.getUser(trade.userId);
       if (!user || !user.apiKey || !user.apiSecret || !user.apiPassphrase) {
@@ -804,6 +810,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // Close running position
             logRequest(req, 'Closing futures trade', {
               tradeId: trade.lnMarketsId,
+              tradeIdType: typeof trade.lnMarketsId,
+              tradeIdValue: JSON.stringify(trade.lnMarketsId),
             });
             await lnMarkets.closeFuturesTrade(trade.lnMarketsId);
             logSuccess(req, 'Futures trade closed successfully');

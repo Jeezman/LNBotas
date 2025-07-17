@@ -1,4 +1,4 @@
-import { createRestClient } from '@ln-markets/api';
+import { createHmac } from 'crypto';
 
 export interface LNMarketsConfig {
   apiKey: string;
@@ -100,63 +100,180 @@ export interface DepositResponse {
 }
 
 export class LNMarketsService {
-  private client: any;
+  private config: LNMarketsConfig;
+  private baseUrl: string;
 
   constructor(config: LNMarketsConfig) {
-    this.client = createRestClient({
-      key: config.apiKey,
-      secret: config.secret,
-      passphrase: config.passphrase,
-      network: config.network || 'mainnet',
-    });
+    this.config = config;
+    this.baseUrl = config.network === 'testnet' 
+      ? 'https://api.testnet4.lnmarkets.com/v2'
+      : 'https://api.lnmarkets.com/v2';
+  }
+
+  private generateSignature(timestamp: string, method: string, path: string, params: string = ''): string {
+    // LN Markets signature format: timestamp + method + path + params
+    // path MUST include /v2 prefix (e.g., /v2/user not /user)
+    // params: URLSearchParams for GET/DELETE, JSON for POST/PUT, empty string if no data
+    const fullPath = `/v2${path}`;
+    const message = timestamp + method.toUpperCase() + fullPath + params;
+    
+    console.log('Signature generation:');
+    console.log('  Timestamp:', timestamp);
+    console.log('  Method:', method.toUpperCase());
+    console.log('  Full path:', fullPath);
+    console.log('  Params:', params);
+    console.log('  Message:', message);
+    
+    const signature = createHmac('sha256', this.config.secret)
+      .update(message)
+      .digest('base64');
+    
+    console.log('  Generated signature:', signature);
+    return signature;
+  }
+
+  private async makeRequest(method: string, path: string, data?: any): Promise<any> {
+    // LN Markets API expects timestamp in milliseconds since Unix Epoch
+    // Must be within 30 seconds of API server time
+    const timestamp = Date.now().toString();
+    const upperMethod = method.toUpperCase();
+    
+    let params = '';
+    let signaturePath = path;
+    let requestPath = path;
+    let requestBody: string | undefined;
+    
+    // Parse path to separate base path from existing query parameters
+    const [basePath, existingQuery] = path.split('?');
+    signaturePath = basePath; // Use base path for signature
+    
+    // Handle params based on HTTP method according to LN Markets API spec
+    if (upperMethod.match(/^(GET|DELETE)$/)) {
+      // For GET/DELETE: use existing query parameters for signature
+      if (existingQuery) {
+        params = existingQuery;
+      } else if (data) {
+        // Convert data to URLSearchParams only if no existing query parameters
+        const searchParams = new URLSearchParams();
+        Object.entries(data).forEach(([key, value]) => {
+          if (value !== undefined && value !== null) {
+            searchParams.append(key, String(value));
+          }
+        });
+        params = searchParams.toString();
+        if (params) {
+          requestPath = `${basePath}?${params}`;
+        }
+      }
+      // No body for GET/DELETE
+      requestBody = undefined;
+    } else {
+      // For POST/PUT: use JSON with no spaces
+      if (data) {
+        params = JSON.stringify(data);
+        requestBody = params;
+      }
+    }
+    
+    const signature = this.generateSignature(timestamp, upperMethod, signaturePath, params);
+    
+    const url = `${this.baseUrl}${requestPath}`;
+    const headers = {
+      'LNM-ACCESS-KEY': this.config.apiKey,
+      'LNM-ACCESS-SIGNATURE': signature,
+      'LNM-ACCESS-PASSPHRASE': this.config.passphrase,
+      'LNM-ACCESS-TIMESTAMP': timestamp,
+      'Content-Type': 'application/json'
+    };
+
+    const requestOptions: RequestInit = {
+      method: upperMethod,
+      headers,
+      ...(requestBody && { body: requestBody })
+    };
+
+    console.log('Making request to:', url);
+    console.log('Headers:', headers);
+    console.log('Request body:', requestBody);
+    
+    const response = await fetch(url, requestOptions);
+    
+    if (!response.ok) {
+      const errorBody = await response.text();
+      console.error('API Error Response:', errorBody);
+      throw new Error(`HTTP ${response.status}: ${errorBody}`);
+    }
+
+    return response.json();
   }
 
   // User operations
   async getUserInfo(): Promise<UserInfo> {
-    return this.client.userGet();
+    return this.makeRequest('GET', '/user');
   }
 
   async getBalance(): Promise<{ balance: string }> {
-    const userInfo = await this.client.userGet();
+    const userInfo = await this.makeRequest('GET', '/user');
     console.log('LN Markets userInfo:', userInfo);
     return { balance: userInfo.balance.toString() };
   }
 
   // Futures operations
   async createFuturesTrade(trade: FuturesTradeRequest): Promise<any> {
-    return this.client.futuresNewTrade(trade);
+    return this.makeRequest('POST', '/futures', trade);
   }
 
   async getFuturesTrades(
     type: 'open' | 'closed' | 'running' = 'open'
   ): Promise<LNMarketsTrade[]> {
-    // return this.client.futuresGetTrades({ type, from: 1714633904 });
-    return this.client.futuresGetTrades({ type, from: 1751299710 });
+    const params = new URLSearchParams();
+    params.append('type', type);
+    params.append('from', '1751299710');
+    params.append('limit', '100');
+    const url = `/futures?${params.toString()}`;
+    return this.makeRequest('GET', url);
   }
 
   async updateFuturesTrade(
     id: string,
     updates: { takeprofit?: number; stoploss?: number }
   ): Promise<any> {
-    return this.client.futuresUpdateTrade({ id, ...updates });
+    if (!id || id === 'undefined' || id === 'null') {
+      throw new Error('Invalid trade ID provided for updating futures trade');
+    }
+    
+    // Build query parameters for valid updates only
+    const params = new URLSearchParams();
+    params.append('id', String(id));
+    
+    if (updates.takeprofit !== undefined && updates.takeprofit !== null) {
+      params.append('takeprofit', updates.takeprofit.toString());
+    }
+    if (updates.stoploss !== undefined && updates.stoploss !== null) {
+      params.append('stoploss', updates.stoploss.toString());
+    }
+    
+    const url = `/futures?${params.toString()}`;
+    return this.makeRequest('PUT', url);
   }
 
   async closeFuturesTrade(id: string): Promise<any> {
-    // Use the dedicated library method for closing futures trades
     console.log('Closing futures trade with ID:', id);
+    console.log('ID type:', typeof id);
+    console.log('ID value:', JSON.stringify(id));
+    
+    if (!id || id === 'undefined' || id === 'null') {
+      throw new Error('Invalid trade ID provided for closing futures trade');
+    }
+    
+    // Ensure id is a string
+    const tradeId = String(id);
+    const url = `/futures?id=${encodeURIComponent(tradeId)}`;
     try {
-      // Try different method names that might be available
-      if (this.client.futuresCloseTrade) {
-        const result = await this.client.futuresCloseTrade({ id });
-        console.log('Futures trade close result:', result);
-        return result;
-      } else if (this.client.futuresClosePosition) {
-        const result = await this.client.futuresClosePosition({ id });
-        console.log('Futures position close result:', result);
-        return result;
-      } else {
-        throw new Error('No suitable method found for closing futures trades');
-      }
+      console.log('Request URL for closeFuturesTrade:', url);
+      const result = await this.makeRequest('DELETE', url);
+      console.log('Futures trade close result:', result);
+      return result;
     } catch (error) {
       console.error('Error closing futures trade:', error);
       throw error;
@@ -164,31 +281,25 @@ export class LNMarketsService {
   }
 
   async closeAllFuturesTrades(): Promise<any> {
-    return this.client.futuresCloseAllTrades();
+    return this.makeRequest('DELETE', '/futures/all');
   }
 
   async cancelAllFuturesOrders(): Promise<any> {
-    return this.client.futuresCancelAllTrades();
+    return this.makeRequest('DELETE', '/futures/cancel-all');
   }
 
   async cancelFuturesOrder(id: string): Promise<any> {
-    // Use the dedicated library method for cancelling individual futures orders
     console.log('Cancelling futures order with ID:', id);
+    
+    if (!id || id === 'undefined' || id === 'null') {
+      throw new Error('Invalid order ID provided for cancelling futures order');
+    }
+    
     try {
-      // Try different method names that might be available
-      if (this.client.futuresCancelTrade) {
-        const result = await this.client.futuresCancelTrade(id);
-        console.log('Futures order cancel result:', result);
-        return result;
-      } else if (this.client.futuresCancelOrder) {
-        const result = await this.client.futuresCancelOrder(id);
-        console.log('Futures order cancel result:', result);
-        return result;
-      } else {
-        throw new Error(
-          'No suitable method found for cancelling futures orders'
-        );
-      }
+      const url = `/futures/cancel?id=${encodeURIComponent(String(id))}`;
+      const result = await this.makeRequest('POST', url);
+      console.log('Futures order cancel result:', result);
+      return result;
     } catch (error) {
       console.error('Error cancelling futures order:', error);
       throw error;
@@ -197,43 +308,62 @@ export class LNMarketsService {
 
   // Options operations
   async createOptionsTrade(trade: OptionsTradeRequest): Promise<any> {
-    return this.client.optionsNewTrade(trade);
+    return this.makeRequest('POST', '/options', trade);
   }
 
   async getOptionsTrades(): Promise<any[]> {
-    return this.client.optionsGetTrades();
+    return this.makeRequest('GET', '/options');
   }
 
   async closeOptionsTrade(id: string): Promise<any> {
-    return this.client.optionsCloseTrade({ id });
+    if (!id || id === 'undefined' || id === 'null') {
+      throw new Error('Invalid trade ID provided for closing options trade');
+    }
+    
+    const url = `/options?id=${encodeURIComponent(String(id))}`;
+    return this.makeRequest('DELETE', url);
   }
 
   async getOptionsInstruments(): Promise<any[]> {
-    return this.client.optionsGetInstruments();
+    return this.makeRequest('GET', '/options/instruments');
   }
 
   // Market data operations
   async getFuturesTicker(): Promise<MarketTicker> {
-    return this.client.futuresGetTicker();
+    return this.makeRequest('GET', '/futures/market');
   }
 
   // Note: futuresGetMarket() method is not available in the LN Markets API
   // Market data can be obtained through getFuturesTicker() method
 
   async getPriceHistory(from?: number, to?: number): Promise<any[]> {
-    return this.client.futuresGetPriceHistory({ from, to });
+    const params = new URLSearchParams();
+    if (from !== undefined && from !== null) params.append('from', from.toString());
+    if (to !== undefined && to !== null) params.append('to', to.toString());
+    const query = params.toString();
+    return this.makeRequest('GET', `/futures/history/price${query ? '?' + query : ''}`);
   }
 
   async getIndexHistory(from?: number, to?: number): Promise<any[]> {
-    return this.client.futuresGetIndexHistory({ from, to });
+    const params = new URLSearchParams();
+    if (from !== undefined && from !== null) params.append('from', from.toString());
+    if (to !== undefined && to !== null) params.append('to', to.toString());
+    const query = params.toString();
+    return this.makeRequest('GET', `/futures/history/index${query ? '?' + query : ''}`);
   }
 
   async getCarryFees(): Promise<any[]> {
-    return this.client.futuresGetCarryFees();
+    const params = new URLSearchParams();
+    params.append('from', '1751299710');
+    params.append('to', Math.floor(Date.now() / 1000).toString());
+    const url = `/futures/carry-fees?${params.toString()}`;
+    return this.makeRequest('GET', url);
   }
 
   async getVolatility(): Promise<any> {
-    return this.client.optionsGetVolatility();
+    // This endpoint doesn't exist in the current LN Markets API
+    console.warn('getVolatility endpoint not available in LN Markets API');
+    return [];
   }
 
   // Deposit operations
@@ -247,7 +377,7 @@ export class LNMarketsService {
       );
 
       // Call the actual LN Markets userDeposit function
-      const depositResponse = await this.client.userDeposit({
+      const depositResponse = await this.makeRequest('POST', '/user/deposit', {
         amount: request.amount || 100000, // Default to 100k satoshis if not specified
       });
 
@@ -279,7 +409,7 @@ export class LNMarketsService {
   async getDepositHistory(): Promise<any[]> {
     try {
       console.log('Calling LN Markets userDepositHistory API');
-      const depositHistory = await this.client.userDepositHistory({});
+      const depositHistory = await this.makeRequest('GET', '/user/deposit-history');
       console.log('LN Markets deposit history response:', depositHistory);
       return depositHistory || [];
     } catch (error) {
