@@ -124,9 +124,9 @@ export function ActivePositions() {
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <CardTitle className="text-lg font-semibold text-gray-900">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+            <CardTitle className="text-base lg:text-lg font-semibold text-gray-900">
               Active Positions
             </CardTitle>
             <div className="flex items-center gap-2">
@@ -149,117 +149,91 @@ export function ActivePositions() {
               </Select>
             </div>
           </div>
-          <div className="flex items-center space-x-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button
               variant="outline"
               size="sm"
               onClick={() => syncOpenTrades.mutate()}
               disabled={syncOpenTrades.isPending}
+              className="text-xs"
             >
               <RefreshCw
-                className={`h-4 w-4 mr-1 ${
+                className={`h-3 w-3 mr-1 ${
                   syncOpenTrades.isPending ? 'animate-spin' : ''
                 }`}
               />
-              Open
+              <span className="hidden sm:inline">Open</span>
             </Button>
             <Button
               variant="outline"
               size="sm"
               onClick={() => syncRunningTrades.mutate()}
               disabled={syncRunningTrades.isPending}
+              className="text-xs"
             >
               <RefreshCw
-                className={`h-4 w-4 mr-1 ${
+                className={`h-3 w-3 mr-1 ${
                   syncRunningTrades.isPending ? 'animate-spin' : ''
                 }`}
               />
-              Running
+              <span className="hidden sm:inline">Running</span>
             </Button>
             <Button
               variant="outline"
               size="sm"
               onClick={() => syncClosedTrades.mutate()}
               disabled={syncClosedTrades.isPending}
+              className="text-xs"
             >
               <RefreshCw
-                className={`h-4 w-4 mr-1 ${
+                className={`h-3 w-3 mr-1 ${
                   syncClosedTrades.isPending ? 'animate-spin' : ''
                 }`}
               />
-              Closed
+              <span className="hidden sm:inline">Closed</span>
             </Button>
             <Button
               variant="outline"
               size="sm"
               onClick={() => syncAllTrades.mutate()}
               disabled={syncAllTrades.isPending}
+              className="text-xs"
             >
               <RefreshCw
-                className={`h-4 w-4 mr-1 ${
+                className={`h-3 w-3 mr-1 ${
                   syncAllTrades.isPending ? 'animate-spin' : ''
                 }`}
               />
-              All
+              <span className="hidden sm:inline">All</span>
             </Button>
-            {filteredTrades.filter(trade => trade.status === 'running').length > 0 && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleCloseAllClick}
-                disabled={closeAllTrades.isPending}
-                title="Close all running positions"
-              >
-                Close All
-              </Button>
-            )}
-            {filteredTrades.filter(trade => trade.status === 'open').length > 0 && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleCancelAllOrdersClick}
-                disabled={cancelAllOrders.isPending}
-                title="Cancel all open orders"
-              >
-                Cancel Orders
-              </Button>
-            )}
           </div>
         </div>
       </CardHeader>
       <CardContent>
         {filteredTrades.length === 0 ? (
           <div className="text-center py-8">
-            <p className="text-gray-500">
-              {trades.length === 0
-                ? 'No active positions'
-                : `No ${
-                    statusFilter === 'all' ? '' : statusFilter + ' '
-                  }positions`}
-            </p>
-            <p className="text-sm text-gray-400">
-              {trades.length === 0
-                ? 'Create a new trade to see positions here'
-                : 'Try selecting a different filter'}
-            </p>
+            <p className="text-gray-500">No active positions found.</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Side</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Entry Price</TableHead>
-                  <TableHead>Size</TableHead>
-                  <TableHead>PnL</TableHead>
-                  <TableHead>Actions</TableHead>
+                  <TableHead className="text-xs lg:text-sm">Side</TableHead>
+                  <TableHead className="text-xs lg:text-sm">Type</TableHead>
+                  <TableHead className="text-xs lg:text-sm">Margin</TableHead>
+                  <TableHead className="text-xs lg:text-sm">Leverage</TableHead>
+                  <TableHead className="text-xs lg:text-sm">Entry Price</TableHead>
+                  <TableHead className="text-xs lg:text-sm">P/L</TableHead>
+                  <TableHead className="text-xs lg:text-sm">Status</TableHead>
+                  <TableHead className="text-xs lg:text-sm">Created</TableHead>
+                  <TableHead className="text-xs lg:text-sm text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredTrades.map((trade) => (
                   <TableRow key={trade.id}>
-                    <TableCell>
+                    <TableCell className="text-xs lg:text-sm">
                       <Badge
                         variant={getSideBadgeVariant(trade.side)}
                         className={getSideBadgeClassName(trade.side)}
@@ -267,36 +241,19 @@ export function ActivePositions() {
                         {trade.side === 'buy' ? 'Long' : 'Short'}
                       </Badge>
                     </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={
-                          trade.status === 'running' ? 'default' : 'secondary'
-                        }
-                        className={
-                          trade.status === 'running'
-                            ? 'bg-green-600 text-white'
-                            : trade.status === 'open'
-                            ? 'bg-yellow-600 text-white'
-                            : 'bg-gray-600 text-white'
-                        }
-                      >
-                        {trade.status === 'running'
-                          ? 'Running'
-                          : trade.status === 'open'
-                          ? 'Open'
-                          : trade.status.charAt(0).toUpperCase() +
-                            trade.status.slice(1)}
+                    <TableCell className="text-xs lg:text-sm">
+                      <Badge variant="outline" className="text-xs">
+                        {trade.type}
                       </Badge>
                     </TableCell>
-                    <TableCell className="font-mono text-sm">
-                      {trade.entryPrice
-                        ? `$${parseFloat(trade.entryPrice).toLocaleString()}`
-                        : 'Pending'}
+                    <TableCell className="text-xs lg:text-sm font-mono">
+                      {trade.margin} sats
                     </TableCell>
-                    <TableCell className="font-mono text-sm">
-                      {trade.quantity
-                        ? `₿ ${parseFloat(trade.quantity).toFixed(4)}`
-                        : 'N/A'}
+                    <TableCell className="text-xs lg:text-sm">
+                      {trade.leverage}x
+                    </TableCell>
+                    <TableCell className="text-xs lg:text-sm">
+                      {trade.entryPrice}
                     </TableCell>
                     <TableCell>
                       {trade.pnl ? (
@@ -319,41 +276,33 @@ export function ActivePositions() {
                         </span>
                       )}
                     </TableCell>
-                    <TableCell>
-                      <div className="flex items-center space-x-2">
-                        <Button variant="ghost" size="sm">
-                          <Edit className="h-4 w-4" />
+                    <TableCell className="text-xs lg:text-sm">
+                      <Badge
+                        variant={
+                          trade.status === 'running'
+                            ? 'default'
+                            : trade.status === 'open'
+                            ? 'secondary'
+                            : 'outline'
+                        }
+                        className="text-xs"
+                      >
+                        {trade.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-xs lg:text-sm">
+                      {new Date(trade.createdAt).toLocaleDateString()}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleCloseTradeClick(trade)}
+                          className="h-6 w-6 p-0"
+                        >
+                          <X className="h-3 w-3" />
                         </Button>
-                        {trade.status === 'running' ? (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleCloseTradeClick(trade)}
-                            disabled={closeTrade.isPending}
-                            title="Close position"
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        ) : trade.status === 'open' ? (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleCloseTradeClick(trade)}
-                            disabled={closeTrade.isPending}
-                            title="Cancel order"
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        ) : (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            disabled
-                            title="Cannot close closed trade"
-                          >
-                            <X className="h-4 w-4 opacity-50" />
-                          </Button>
-                        )}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -362,28 +311,45 @@ export function ActivePositions() {
             </Table>
           </div>
         )}
+
+        {filteredTrades.length > 0 && (
+          <div className="flex flex-col sm:flex-row gap-2 mt-4">
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={handleCloseAllClick}
+              className="text-xs"
+            >
+              Close All Positions
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleCancelAllOrdersClick}
+              className="text-xs"
+            >
+              Cancel All Orders
+            </Button>
+          </div>
+        )}
+
+        <CloseTradeModal
+          isOpen={isCloseTradeModalOpen}
+          onClose={() => setIsCloseTradeModalOpen(false)}
+          onConfirm={handleCloseTradeConfirm}
+          trade={selectedTrade}
+          isLoading={closeTrade.isPending}
+        />
+
+                 <CloseAllTradesModal
+           trades={filteredTrades}
+           isOpen={isCloseAllModalOpen}
+           onClose={() => setIsCloseAllModalOpen(false)}
+           onConfirm={handleCloseAllConfirm}
+           type={closeAllModalType}
+           isLoading={closeAllTrades.isPending || cancelAllOrders.isPending}
+         />
       </CardContent>
-
-      {/* Confirmation Modals */}
-      <CloseTradeModal
-        trade={selectedTrade}
-        isOpen={isCloseTradeModalOpen}
-        onClose={() => {
-          setIsCloseTradeModalOpen(false);
-          setSelectedTrade(null);
-        }}
-        onConfirm={handleCloseTradeConfirm}
-        isLoading={closeTrade.isPending}
-      />
-
-      <CloseAllTradesModal
-        trades={filteredTrades}
-        type={closeAllModalType}
-        isOpen={isCloseAllModalOpen}
-        onClose={() => setIsCloseAllModalOpen(false)}
-        onConfirm={handleCloseAllConfirm}
-        isLoading={closeAllModalType === 'close-all' ? closeAllTrades.isPending : cancelAllOrders.isPending}
-      />
     </Card>
   );
 }

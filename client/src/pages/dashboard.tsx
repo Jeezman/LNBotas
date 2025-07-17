@@ -1,4 +1,5 @@
 import { Sidebar } from '@/components/layout/sidebar';
+import { MobileNav } from '@/components/layout/mobile-nav';
 import { MarketOverview } from '@/components/trading/market-overview';
 import { ActivePositions } from '@/components/trading/active-positions';
 import { TradingForm } from '@/components/trading/trading-form';
@@ -21,15 +22,15 @@ function DashboardContent() {
     <>
       <MarketOverview />
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mt-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6 mt-4 lg:mt-6">
         {/* Trading Panel */}
-        <div className="xl:col-span-2 space-y-6">
+        <div className="lg:col-span-2 space-y-4 lg:space-y-6">
           <ActivePositions />
           <ScheduledTrades />
         </div>
 
         {/* Trading Form */}
-        <div className="space-y-6">
+        <div className="space-y-4 lg:space-y-6">
           <TradingForm />
           <ScheduledTradeForm />
           <MarketInfo />
@@ -111,26 +112,27 @@ export default function Dashboard() {
 
       <main className="flex-1 flex flex-col overflow-hidden">
         {/* Top Bar */}
-        <header className="bg-white border-b border-gray-200 px-6 py-4">
+        <header className="bg-white border-b border-gray-200 px-4 lg:px-6 py-3 lg:py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <h2 className="text-2xl font-bold text-gray-900">
+            <div className="flex items-center space-x-2 lg:space-x-4">
+              <MobileNav />
+              <h2 className="text-lg lg:text-2xl font-bold text-gray-900">
                 {getPageTitle()}
               </h2>
               {location === '/' && (
-                <div className="flex items-center space-x-2">
+                <div className="hidden sm:flex items-center space-x-2">
                   <div className="w-2 h-2 bg-success rounded-full"></div>
                   <span className="text-sm text-gray-600">Market Open</span>
                 </div>
               )}
             </div>
 
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2 lg:space-x-4">
               {/* Balance Display */}
-              <div className="flex items-center space-x-3 bg-gray-50 px-4 py-2 rounded-lg">
+              <div className="hidden sm:flex items-center space-x-3 bg-gray-50 px-3 lg:px-4 py-2 rounded-lg">
                 <div className="text-center">
                   <p className="text-xs text-gray-500">Available Balance</p>
-                  <p className="text-lg font-mono font-semibold text-gray-900">
+                  <p className="text-sm lg:text-lg font-mono font-semibold text-gray-900">
                     {user?.balance
                       ? `₿ ${parseFloat(user.balance).toLocaleString()}`
                       : '₿ 0.00000000'}
@@ -138,7 +140,7 @@ export default function Dashboard() {
                 </div>
                 <div className="text-center">
                   <p className="text-xs text-gray-500">USD Equivalent</p>
-                  <p className="text-lg font-mono font-semibold text-gray-900">
+                  <p className="text-sm lg:text-lg font-mono font-semibold text-gray-900">
                     {user?.balanceUSD
                       ? `$${parseFloat(user.balanceUSD).toLocaleString(
                           'en-US',
@@ -158,10 +160,34 @@ export default function Dashboard() {
                 </Button>
               </div>
 
+              {/* Mobile Balance Display */}
+              <div className="sm:hidden flex items-center space-x-2 bg-gray-50 px-2 py-1 rounded-lg">
+                <div className="text-center">
+                  <p className="text-xs text-gray-500">Balance</p>
+                  <p className="text-xs font-mono font-semibold text-gray-900">
+                    {user?.balanceUSD
+                      ? `$${parseFloat(user.balanceUSD).toLocaleString(
+                          'en-US',
+                          { minimumFractionDigits: 0, maximumFractionDigits: 0 }
+                        )}`
+                      : '$0'}
+                  </p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => syncBalance.mutate()}
+                  disabled={syncBalance.isPending}
+                  className="text-gray-600 hover:text-gray-900 p-1"
+                >
+                  <RefreshCw className={`w-3 h-3 ${syncBalance.isPending ? 'animate-spin' : ''}`} />
+                </Button>
+              </div>
+
               {location === '/' && (
-                <Button className="bg-primary text-white hover:bg-blue-800">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Deposit
+                <Button className="bg-primary text-white hover:bg-blue-800 text-sm lg:text-base">
+                  <Plus className="w-3 h-3 lg:w-4 lg:h-4 mr-1 lg:mr-2" />
+                  <span className="hidden sm:inline">Deposit</span>
                 </Button>
               )}
             </div>
@@ -169,7 +195,7 @@ export default function Dashboard() {
         </header>
 
         {/* Page Content */}
-        <div className="flex-1 overflow-y-auto p-6">{renderPageContent()}</div>
+        <div className="flex-1 overflow-y-auto p-4 lg:p-6">{renderPageContent()}</div>
       </main>
     </div>
   );

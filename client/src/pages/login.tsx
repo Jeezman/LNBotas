@@ -44,30 +44,30 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center p-4 sm:p-6">
+      <Card className="w-full max-w-sm sm:max-w-md">
+        <CardHeader className="text-center pb-4">
           <div className="flex justify-center mb-4">
-            <div className="h-12 w-12 bg-primary/10 rounded-full flex items-center justify-center">
-              <LogIn className="h-6 w-6 text-primary" />
+            <div className="h-10 w-10 sm:h-12 sm:w-12 bg-primary/10 rounded-full flex items-center justify-center">
+              <LogIn className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
             </div>
           </div>
-          <CardTitle className="text-2xl">Sign In</CardTitle>
-          <CardDescription>
+          <CardTitle className="text-xl sm:text-2xl">Sign In</CardTitle>
+          <CardDescription className="text-sm sm:text-base">
             Sign in to your account to access Bitcoin derivatives trading
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
               <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />
-                <AlertDescription>{error}</AlertDescription>
+                <AlertDescription className="text-sm">{error}</AlertDescription>
               </Alert>
             )}
             
             <div className="space-y-2">
-              <Label htmlFor="username">Username</Label>
+              <Label htmlFor="username" className="text-sm sm:text-base">Username</Label>
               <Input
                 id="username"
                 type="text"
@@ -75,11 +75,12 @@ export default function LoginPage() {
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="Enter your username"
                 required
+                className="text-sm sm:text-base"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password" className="text-sm sm:text-base">Password</Label>
               <Input
                 id="password"
                 type="password"
@@ -87,12 +88,13 @@ export default function LoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Enter your password"
                 required
+                className="text-sm sm:text-base"
               />
             </div>
 
             <Button 
               type="submit" 
-              className="w-full" 
+              className="w-full text-sm sm:text-base py-2 sm:py-3" 
               disabled={isLoading}
             >
               {isLoading ? "Signing In..." : "Sign In"}
@@ -100,11 +102,11 @@ export default function LoginPage() {
           </form>
 
           <div className="mt-6 text-center">
-            <p className="text-sm text-gray-600 dark:text-gray-400">
+            <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
               Don't have an account?{" "}
               <button
                 onClick={() => setLocation("/register")}
-                className="text-primary hover:underline"
+                className="text-primary hover:underline font-medium"
               >
                 Create one here
               </button>

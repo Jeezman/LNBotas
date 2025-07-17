@@ -88,12 +88,12 @@ export function TradingForm() {
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="text-lg font-semibold text-gray-900">New Trade</CardTitle>
+      <CardHeader className="pb-4">
+        <CardTitle className="text-base lg:text-lg font-semibold text-gray-900">New Trade</CardTitle>
       </CardHeader>
       <CardContent>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3 lg:space-y-4">
             {/* Trade Type */}
             <div>
               <Label className="block text-sm font-medium text-gray-700 mb-2">Trade Type</Label>
@@ -179,7 +179,8 @@ export function TradingForm() {
                   }}
                   className={side === 'buy' ? 'bg-green-600 hover:bg-green-700 text-white' : 'text-green-600 border-green-600 hover:bg-green-50'}
                 >
-                  Buy / Long
+                  <span className="hidden sm:inline">Buy / Long</span>
+                  <span className="sm:hidden">Buy</span>
                 </Button>
                 <Button
                   type="button"
@@ -190,7 +191,8 @@ export function TradingForm() {
                   }}
                   className={side === 'sell' ? 'bg-red-600 hover:bg-red-700 text-white' : 'text-red-600 border-red-600 hover:bg-red-50'}
                 >
-                  Sell / Short
+                  <span className="hidden sm:inline">Sell / Short</span>
+                  <span className="sm:hidden">Sell</span>
                 </Button>
               </div>
             </div>
@@ -244,7 +246,7 @@ export function TradingForm() {
             />
 
             {/* Take Profit & Stop Loss */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 lg:gap-4">
               <FormField
                 control={form.control}
                 name="takeProfit"
@@ -282,30 +284,30 @@ export function TradingForm() {
             </div>
 
             {/* Position Summary */}
-            <div className="bg-gray-50 p-4 rounded-lg space-y-2">
+            <div className="bg-gray-50 p-3 lg:p-4 rounded-lg space-y-2">
               <div className="flex justify-between text-sm">
                 <span className="text-gray-600">Position Size:</span>
-                <span className="font-mono">₿ {positionSize}</span>
+                <span className="font-mono text-xs lg:text-sm">₿ {positionSize}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-gray-600">Est. Fee:</span>
-                <span className="font-mono">{estimatedFee} sats</span>
+                <span className="font-mono text-xs lg:text-sm">{estimatedFee} sats</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-gray-600">Liquidation Price:</span>
-                <span className="font-mono">${liquidationPrice}</span>
+                <span className="font-mono text-xs lg:text-sm">${liquidationPrice}</span>
               </div>
             </div>
 
             {/* Submit Button */}
             <Button 
               type="submit" 
-              className="w-full bg-primary text-white py-3 hover:bg-blue-800"
+              className="w-full bg-primary text-white py-2 lg:py-3 hover:bg-blue-800"
               disabled={createTrade.isPending}
             >
               <div className="flex items-center justify-center space-x-2">
                 <Zap className="h-4 w-4" />
-                <span>{createTrade.isPending ? 'Placing Order...' : 'Place Order'}</span>
+                <span className="text-sm lg:text-base">{createTrade.isPending ? 'Placing Order...' : 'Place Order'}</span>
               </div>
             </Button>
           </form>

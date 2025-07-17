@@ -61,6 +61,31 @@
 
   body {
     @apply font-sans antialiased bg-background text-foreground;
+    /* Prevent horizontal scroll on mobile */
+    overflow-x: hidden;
+  }
+
+  /* Improve touch targets on mobile */
+  @media (max-width: 768px) {
+    button, [role="button"] {
+      min-height: 44px;
+      min-width: 44px;
+    }
+    
+    input, select, textarea {
+      font-size: 16px; /* Prevents zoom on iOS */
+    }
+  }
+
+  /* Improve table responsiveness */
+  @media (max-width: 640px) {
+    table {
+      font-size: 0.875rem;
+    }
+    
+    th, td {
+      padding: 0.5rem 0.25rem;
+    }
   }
 }
 
@@ -91,5 +116,60 @@
   }
   .border-danger {
     border-color: hsl(var(--danger));
+  }
+
+  /* Mobile-specific utilities */
+  .mobile-scroll {
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+  }
+
+  .mobile-safe-area {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* Responsive text utilities */
+  .text-responsive-xs {
+    @apply text-xs sm:text-sm;
+  }
+
+  .text-responsive-sm {
+    @apply text-sm sm:text-base;
+  }
+
+  .text-responsive-base {
+    @apply text-base sm:text-lg;
+  }
+
+  .text-responsive-lg {
+    @apply text-lg sm:text-xl;
+  }
+
+  .text-responsive-xl {
+    @apply text-xl sm:text-2xl;
+  }
+
+  /* Responsive spacing utilities */
+  .space-responsive {
+    @apply space-y-3 lg:space-y-4;
+  }
+
+  .gap-responsive {
+    @apply gap-3 lg:gap-4;
+  }
+
+  .p-responsive {
+    @apply p-3 lg:p-4;
+  }
+
+  .px-responsive {
+    @apply px-3 lg:px-4;
+  }
+
+  .py-responsive {
+    @apply py-2 lg:py-3;
   }
 }

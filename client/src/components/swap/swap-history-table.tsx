@@ -61,13 +61,13 @@ export function SwapHistoryTable({ showSyncButton = true }: SwapHistoryTableProp
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
           <div>
-            <CardTitle className="flex items-center gap-2">
-              <ArrowUpDown className="h-5 w-5" />
+            <CardTitle className="flex items-center gap-2 text-base lg:text-lg">
+              <ArrowUpDown className="h-4 w-4 lg:h-5 lg:w-5" />
               Swap History
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="text-sm lg:text-base">
               View your swap transaction history ({swaps.length} swaps)
             </CardDescription>
           </div>
@@ -77,10 +77,15 @@ export function SwapHistoryTable({ showSyncButton = true }: SwapHistoryTableProp
               disabled={syncSwaps.isPending}
               variant="outline"
               size="sm"
-              className="flex items-center gap-2"
+              className="flex items-center gap-2 text-xs lg:text-sm w-full lg:w-auto"
             >
-              <RefreshCw className={`h-4 w-4 ${syncSwaps.isPending ? 'animate-spin' : ''}`} />
-              {syncSwaps.isPending ? 'Syncing...' : 'Sync from LN Markets'}
+              <RefreshCw className={`h-3 w-3 lg:h-4 lg:w-4 ${syncSwaps.isPending ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">
+                {syncSwaps.isPending ? 'Syncing...' : 'Sync from LN Markets'}
+              </span>
+              <span className="sm:hidden">
+                {syncSwaps.isPending ? 'Syncing...' : 'Sync'}
+              </span>
             </Button>
           )}
         </div>
@@ -88,68 +93,77 @@ export function SwapHistoryTable({ showSyncButton = true }: SwapHistoryTableProp
       <CardContent>
         {swaps.length === 0 ? (
           <div className="text-center py-8">
-            <ArrowUpDown className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <p className="text-muted-foreground mb-2">No swaps found</p>
-            <p className="text-sm text-muted-foreground">
+            <ArrowUpDown className="h-10 w-10 lg:h-12 lg:w-12 text-gray-400 mx-auto mb-4" />
+            <p className="text-muted-foreground mb-2 text-sm lg:text-base">No swaps found</p>
+            <p className="text-xs lg:text-sm text-muted-foreground">
               Your swap transactions will appear here once you execute your first swap.
             </p>
           </div>
         ) : (
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Status</TableHead>
-                  <TableHead>From</TableHead>
-                  <TableHead>To</TableHead>
-                  <TableHead>Exchange Rate</TableHead>
-                  <TableHead>Fee</TableHead>
-                  <TableHead>Date</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {swaps.map((swap: Swap) => (
-                  <TableRow key={swap.id}>
-                    <TableCell>
-                      <Badge variant={getStatusBadgeVariant(swap.status)}>
-                        {swap.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline" className="font-mono">
-                          {swap.fromAsset}
-                        </Badge>
-                        <span className="font-mono text-sm">
-                          {formatAssetAmount(swap.fromAsset, swap.fromAmount)}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline" className="font-mono">
-                          {swap.toAsset}
-                        </Badge>
-                        <span className="font-mono text-sm">
-                          {formatAssetAmount(swap.toAsset, swap.toAmount)}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="font-mono text-sm">
-                      {formatExchangeRate(swap.exchangeRate)}
-                    </TableCell>
-                    <TableCell className="font-mono text-sm">
-                      {swap.fee ? `${swap.fee.toLocaleString()} sats` : '—'}
-                    </TableCell>
-                    <TableCell>
-                      <div className="text-sm">
-                        {formatDistanceToNow(new Date(swap.createdAt), { addSuffix: true })}
-                      </div>
-                    </TableCell>
+          <div className="rounded-md border overflow-hidden">
+            <div className="overflow-x-auto mobile-scroll">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="text-xs lg:text-sm">Status</TableHead>
+                    <TableHead className="text-xs lg:text-sm">From</TableHead>
+                    <TableHead className="text-xs lg:text-sm">To</TableHead>
+                    <TableHead className="text-xs lg:text-sm hidden sm:table-cell">Exchange Rate</TableHead>
+                    <TableHead className="text-xs lg:text-sm hidden md:table-cell">Fee</TableHead>
+                    <TableHead className="text-xs lg:text-sm">Date</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {swaps.map((swap: Swap) => (
+                    <TableRow key={swap.id}>
+                      <TableCell className="text-xs lg:text-sm">
+                        <Badge variant={getStatusBadgeVariant(swap.status)} className="text-xs">
+                          {swap.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-xs lg:text-sm">
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
+                          <Badge variant="outline" className="font-mono text-xs w-fit">
+                            {swap.fromAsset}
+                          </Badge>
+                          <span className="font-mono text-xs lg:text-sm">
+                            {formatAssetAmount(swap.fromAsset, swap.fromAmount)}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-xs lg:text-sm">
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
+                          <Badge variant="outline" className="font-mono text-xs w-fit">
+                            {swap.toAsset}
+                          </Badge>
+                          <span className="font-mono text-xs lg:text-sm">
+                            {formatAssetAmount(swap.toAsset, swap.toAmount)}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="font-mono text-xs lg:text-sm hidden sm:table-cell">
+                        {formatExchangeRate(swap.exchangeRate)}
+                      </TableCell>
+                      <TableCell className="font-mono text-xs lg:text-sm hidden md:table-cell">
+                        {swap.fee ? `${swap.fee.toLocaleString()} sats` : '—'}
+                      </TableCell>
+                      <TableCell className="text-xs lg:text-sm">
+                        <div className="text-xs lg:text-sm">
+                          {formatDistanceToNow(new Date(swap.createdAt), { addSuffix: true })}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+            
+            {/* Mobile-only summary for hidden columns */}
+            <div className="sm:hidden p-3 bg-gray-50 border-t">
+              <div className="text-xs text-gray-600 space-y-1">
+                <p>💡 <strong>Tip:</strong> Scroll horizontally to see exchange rates and fees</p>
+              </div>
+            </div>
           </div>
         )}
       </CardContent>
