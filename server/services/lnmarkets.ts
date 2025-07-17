@@ -330,7 +330,7 @@ export class LNMarketsService {
 
   // Market data operations
   async getFuturesTicker(): Promise<MarketTicker> {
-    return this.makeRequest('GET', '/futures/market');
+    return this.makeRequest('GET', '/futures/ticker');
   }
 
   // Note: futuresGetMarket() method is not available in the LN Markets API

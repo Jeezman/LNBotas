@@ -157,7 +157,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       // Fetch market data from LN Markets API
-      let marketTicker: MarketTicker,
+      let marketTicker: any,
         futuresMarket: any = null;
 
       try {
@@ -169,6 +169,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         throw tickerError;
       }
 
+      // Validate required fields are present
+      if (!marketTicker || typeof marketTicker !== 'object') {
+        throw new Error('Invalid market ticker response from LN Markets API');
+      }
+
       // Note: getFuturesMarket() method is not available in LN Markets API
       // We'll use ticker data only for now
       logRequest(
@@ -177,21 +182,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
       futuresMarket = null;
 
-      // Calculate volume in USD using available data
-      const lastPrice = marketTicker.lastPrice;
+      // Safely extract values with fallbacks
+      const lastPrice = marketTicker.lastPrice || marketTicker.last_price || marketTicker.price || 0;
+      const indexPrice = marketTicker.index || marketTicker.index_price || lastPrice;
+      const carryFeeRate = marketTicker.carryFeeRate || marketTicker.carry_fee_rate || 0;
+      const carryFeeTimestamp = marketTicker.carryFeeTimestamp || marketTicker.carry_fee_timestamp || Date.now();
+
+      // Validate critical fields
+      if (!lastPrice || typeof lastPrice !== 'number') {
+        throw new Error(`Invalid lastPrice in market ticker response: ${JSON.stringify(marketTicker)}`);
+      }
+
       // Note: LN Markets response doesn't include volume24h, using placeholder
       const volumeUSD = '0.00';
 
       // Map LN Markets data to our schema
       const marketDataUpdate = {
         symbol: 'BTC/USD',
-        lastPrice: marketTicker.lastPrice.toString(),
+        lastPrice: lastPrice.toString(),
         markPrice:
           futuresMarket?.mark_price?.toString() ||
-          marketTicker.lastPrice.toString(), // Fallback to last price
+          lastPrice.toString(), // Fallback to last price
         indexPrice:
           futuresMarket?.index_price?.toString() ||
-          marketTicker.index.toString(), // Use index from ticker
+          indexPrice.toString(), // Use index from ticker
         high24h: null, // Not available in current response
         low24h: null, // Not available in current response
         volume24h: null, // Not available in current response
@@ -199,11 +213,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         openInterest: futuresMarket?.open_interest?.toString() || null,
         fundingRate:
           futuresMarket?.funding_rate?.toString() ||
-          marketTicker.carryFeeRate.toString(),
+          carryFeeRate.toString(),
         priceChange24h: null, // Not available in current response
         nextFundingTime: futuresMarket?.next_funding_time
           ? new Date(futuresMarket.next_funding_time * 1000)
-          : new Date(marketTicker.carryFeeTimestamp), // Use carry fee timestamp
+          : new Date(carryFeeTimestamp), // Use carry fee timestamp
       };
 
       logRequest(req, 'Updating market data in database', marketDataUpdate);
