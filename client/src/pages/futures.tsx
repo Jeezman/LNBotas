@@ -15,7 +15,7 @@ type TradeStatus = "all" | "open" | "closed" | "running" | "cancelled";
 type TradeType = "all" | "futures" | "options";
 
 export default function FuturesPage() {
-  const [statusFilter, setStatusFilter] = useState<TradeStatus>("all");
+  const [statusFilter, setStatusFilter] = useState<TradeStatus>("running");
   const [typeFilter, setTypeFilter] = useState<TradeType>("all");
   
   const { user } = useAuth();
