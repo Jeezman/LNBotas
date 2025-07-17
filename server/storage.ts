@@ -4,6 +4,7 @@ import {
   marketData,
   deposits,
   scheduledTrades,
+  swaps,
   type User,
   type InsertUser,
   type Trade,
@@ -14,6 +15,8 @@ import {
   type InsertDeposit,
   type ScheduledTrade,
   type InsertScheduledTrade,
+  type Swap,
+  type InsertSwap,
 } from '@shared/schema';
 import { db } from './db';
 import { eq, and, or } from 'drizzle-orm';
@@ -63,6 +66,16 @@ export interface IStorage {
     updates: Partial<Deposit>
   ): Promise<Deposit | undefined>;
   deleteDeposit(id: number): Promise<boolean>;
+
+  // Swap operations
+  getSwap(id: number): Promise<Swap | undefined>;
+  getSwapsByUserId(userId: number): Promise<Swap[]>;
+  createSwap(swap: InsertSwap): Promise<Swap>;
+  updateSwap(
+    id: number,
+    updates: Partial<Swap>
+  ): Promise<Swap | undefined>;
+  deleteSwap(id: number): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
@@ -71,11 +84,13 @@ export class MemStorage implements IStorage {
   private scheduledTrades: Map<number, ScheduledTrade>;
   private marketData: Map<string, MarketData>;
   private deposits: Map<number, Deposit>;
+  private swaps: Map<number, Swap>;
   private currentUserId: number;
   private currentTradeId: number;
   private currentScheduledTradeId: number;
   private currentMarketDataId: number;
   private currentDepositId: number;
+  private currentSwapId: number;
 
   constructor() {
     this.users = new Map();
@@ -83,11 +98,13 @@ export class MemStorage implements IStorage {
     this.scheduledTrades = new Map();
     this.marketData = new Map();
     this.deposits = new Map();
+    this.swaps = new Map();
     this.currentUserId = 1;
     this.currentTradeId = 1;
     this.currentScheduledTradeId = 1;
     this.currentMarketDataId = 1;
     this.currentDepositId = 1;
+    this.currentSwapId = 1;
 
     // Create demo user
     this.createDemoUser();
@@ -391,6 +408,50 @@ export class MemStorage implements IStorage {
   async deleteDeposit(id: number): Promise<boolean> {
     return this.deposits.delete(id);
   }
+
+  // Swap operations
+  async getSwap(id: number): Promise<Swap | undefined> {
+    return this.swaps.get(id);
+  }
+
+  async getSwapsByUserId(userId: number): Promise<Swap[]> {
+    return Array.from(this.swaps.values()).filter(swap => swap.userId === userId);
+  }
+
+  async createSwap(insertSwap: InsertSwap): Promise<Swap> {
+    const swap: Swap = {
+      id: this.currentSwapId++,
+      ...insertSwap,
+      lnMarketsId: insertSwap.lnMarketsId || null,
+      exchangeRate: insertSwap.exchangeRate || null,
+      status: insertSwap.status || 'pending',
+      fee: insertSwap.fee || 0,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.swaps.set(swap.id, swap);
+    return swap;
+  }
+
+  async updateSwap(
+    id: number,
+    updates: Partial<Swap>
+  ): Promise<Swap | undefined> {
+    const swap = this.swaps.get(id);
+    if (!swap) return undefined;
+    
+    const updatedSwap: Swap = {
+      ...swap,
+      ...updates,
+      updatedAt: new Date(),
+    };
+    this.swaps.set(id, updatedSwap);
+    return updatedSwap;
+  }
+
+  async deleteSwap(id: number): Promise<boolean> {
+    return this.swaps.delete(id);
+  }
 }
 
 export class DatabaseStorage implements IStorage {
@@ -636,6 +697,51 @@ export class DatabaseStorage implements IStorage {
 
   async deleteDeposit(id: number): Promise<boolean> {
     const result = await db.delete(deposits).where(eq(deposits.id, id));
+    return (result.rowCount || 0) > 0;
+  }
+
+  // Swap operations
+  async getSwap(id: number): Promise<Swap | undefined> {
+    const [swap] = await db
+      .select()
+      .from(swaps)
+      .where(eq(swaps.id, id));
+    return swap || undefined;
+  }
+
+  async getSwapsByUserId(userId: number): Promise<Swap[]> {
+    return db.select().from(swaps).where(eq(swaps.userId, userId));
+  }
+
+  async createSwap(insertSwap: InsertSwap): Promise<Swap> {
+    const [swap] = await db
+      .insert(swaps)
+      .values({
+        ...insertSwap,
+        status: insertSwap.status || 'pending',
+        fee: insertSwap.fee || 0,
+      })
+      .returning();
+    return swap;
+  }
+
+  async updateSwap(
+    id: number,
+    updates: Partial<Swap>
+  ): Promise<Swap | undefined> {
+    const [swap] = await db
+      .update(swaps)
+      .set({
+        ...updates,
+        updatedAt: new Date(),
+      })
+      .where(eq(swaps.id, id))
+      .returning();
+    return swap || undefined;
+  }
+
+  async deleteSwap(id: number): Promise<boolean> {
+    const result = await db.delete(swaps).where(eq(swaps.id, id));
     return (result.rowCount || 0) > 0;
   }
 }

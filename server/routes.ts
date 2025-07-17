@@ -1640,6 +1640,204 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Swap endpoints
+  app.get('/api/swaps/:userId', async (req, res) => {
+    logRequest(req, 'Fetching user swaps', { userId: req.params.userId });
+    try {
+      const userId = parseInt(req.params.userId);
+      const swaps = await storage.getSwapsByUserId(userId);
+      logSuccess(req, 'User swaps retrieved', { count: swaps.length });
+      res.json(swaps);
+    } catch (error) {
+      logError(req, 'Failed to fetch user swaps', error);
+      res.status(500).json({ message: 'Failed to fetch swaps' });
+    }
+  });
+
+  app.post('/api/swaps/execute', async (req, res) => {
+    logRequest(req, 'Executing swap', req.body);
+    try {
+      const { userId, fromAsset, toAsset, amount, specifyInput } = req.body;
+
+      if (!userId || !fromAsset || !toAsset || !amount) {
+        return res.status(400).json({ 
+          message: 'userId, fromAsset, toAsset, and amount are required' 
+        });
+      }
+
+      // Validate asset types
+      if (!['BTC', 'USD'].includes(fromAsset) || !['BTC', 'USD'].includes(toAsset)) {
+        return res.status(400).json({ 
+          message: 'Only BTC and USD assets are supported' 
+        });
+      }
+
+      if (fromAsset === toAsset) {
+        return res.status(400).json({ 
+          message: 'Cannot swap between the same asset' 
+        });
+      }
+
+      // Get user's API credentials
+      const user = await storage.getUser(userId);
+      if (!user || !user.apiKey || !user.apiSecret || !user.apiPassphrase) {
+        return res.status(400).json({ 
+          message: 'User API credentials not configured' 
+        });
+      }
+
+      // Create LN Markets service instance
+      const lnMarketsService = createLNMarketsService({
+        apiKey: user.apiKey,
+        secret: user.apiSecret,
+        passphrase: user.apiPassphrase,
+        network: 'mainnet',
+      });
+
+      // Prepare swap request
+      const swapRequest = {
+        in_asset: fromAsset as 'BTC' | 'USD',
+        out_asset: toAsset as 'BTC' | 'USD',
+        [specifyInput ? 'in_amount' : 'out_amount']: amount,
+      };
+
+      // Execute swap via LN Markets
+      const swapResult = await lnMarketsService.executeSwap(swapRequest);
+
+      // Handle the API response structure
+      let inAmount: number;
+      let outAmount: number;
+
+      if (specifyInput) {
+        // User specified input amount
+        inAmount = amount;
+        outAmount = swapResult.outAmount || 0;
+      } else {
+        // User specified output amount
+        outAmount = amount;
+        inAmount = swapResult.inAmount || 0;
+      }
+
+      // Validate amounts
+      if (!inAmount || !outAmount) {
+        throw new Error('Invalid swap result: missing amount data');
+      }
+
+      // Get current BTC price in USD as the exchange rate
+      const marketTicker = await lnMarketsService.getFuturesTicker();
+      const exchangeRate = marketTicker.lastPrice;
+
+      // Store swap in database
+      const swap = await storage.createSwap({
+        userId,
+        fromAsset,
+        toAsset,
+        fromAmount: inAmount,
+        toAmount: outAmount,
+        exchangeRate: exchangeRate.toString(),
+        status: 'completed',
+        fee: 0, // LN Markets doesn't charge explicit fees for swaps
+      });
+
+      // Sync user balance after swap
+      await syncUserBalance(userId);
+
+      logSuccess(req, 'Swap executed successfully', { 
+        swapId: swap.id, 
+        fromAmount: inAmount,
+        toAmount: outAmount,
+        rate: exchangeRate 
+      });
+
+      res.json(swap);
+    } catch (error) {
+      logError(req, 'Swap execution failed', error);
+      res.status(500).json({ 
+        message: 'Failed to execute swap',
+        detail: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
+  app.post('/api/swaps/sync', async (req, res) => {
+    logRequest(req, 'Starting swap sync from LN Markets');
+    try {
+      const { userId } = req.body;
+
+      if (!userId) {
+        logError(req, 'Swap sync failed - no user ID', new Error('Missing userId'));
+        return res.status(400).json({ message: 'User ID is required' });
+      }
+
+      const user = await storage.getUser(userId);
+      if (!user || !user.apiKey || !user.apiSecret || !user.apiPassphrase) {
+        logError(req, 'Swap sync failed - user credentials missing', new Error('Missing API credentials'));
+        return res.status(400).json({ message: 'User API credentials not found' });
+      }
+
+      const lnMarketsService = createLNMarketsService({
+        apiKey: user.apiKey,
+        secret: user.apiSecret,
+        passphrase: user.apiPassphrase,
+        network: 'mainnet',
+      });
+
+      // Fetch swap history from LN Markets
+      logRequest(req, 'Fetching swap history from LN Markets API');
+      const swapHistory = await lnMarketsService.getSwapHistory();
+      let syncedCount = 0;
+      let updatedCount = 0;
+
+      logRequest(req, 'Processing swap history', { swapsFound: swapHistory.length });
+
+      for (const lnSwap of swapHistory) {
+        // Check if swap already exists in our database
+        const existingSwaps = await storage.getSwapsByUserId(userId);
+        const existingSwap = existingSwaps.find(s => s.lnMarketsId === lnSwap.id);
+
+        if (existingSwap) {
+          // Update existing swap - swaps are typically final, so minimal updates needed
+          await storage.updateSwap(existingSwap.id, {
+            status: 'completed', // LN Markets swaps in history are completed
+            updatedAt: new Date(),
+          });
+          updatedCount++;
+        } else {
+          // Create new swap from LN Markets data
+          const exchangeRate = lnSwap.outAmount / lnSwap.inAmount;
+          await storage.createSwap({
+            userId,
+            lnMarketsId: lnSwap.id,
+            fromAsset: lnSwap.inAsset,
+            toAsset: lnSwap.outAsset,
+            fromAmount: lnSwap.inAmount,
+            toAmount: lnSwap.outAmount,
+            exchangeRate: exchangeRate.toString(),
+            status: 'completed',
+            fee: 0, // LN Markets doesn't charge explicit fees for swaps
+          });
+          syncedCount++;
+        }
+      }
+
+      // Sync balance after swap sync
+      await syncUserBalance(userId);
+
+      const result = {
+        message: 'Swaps synced successfully',
+        syncedCount,
+        updatedCount,
+        totalProcessed: syncedCount + updatedCount,
+      };
+
+      logSuccess(req, 'Swap sync completed successfully', result);
+      res.json(result);
+    } catch (error) {
+      logError(req, 'Swap sync failed', error);
+      res.status(500).json({ message: 'Failed to sync swaps from LN Markets' });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

@@ -126,6 +126,46 @@ export interface ScheduledTradeRequest {
   settlement?: 'physical' | 'cash';
 }
 
+export interface Swap {
+  id: number;
+  userId: number;
+  lnMarketsId: string | null;
+  fromAsset: string;
+  toAsset: string;
+  fromAmount: number;
+  toAmount: number;
+  exchangeRate: string | null;
+  fee: number | null;
+  status: 'pending' | 'completed' | 'failed' | 'cancelled';
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SwapRequest {
+  userId: number;
+  fromAsset: 'BTC' | 'USD';
+  toAsset: 'BTC' | 'USD';
+  amount: number;
+  specifyInput: boolean; // true for input amount, false for output amount
+}
+
+export interface SwapQuote {
+  fromAmount: number;
+  toAmount: number;
+  exchangeRate: number;
+  fee: number;
+  fromSymbol: string;
+  toSymbol: string;
+  expiresAt: string;
+}
+
+export interface SwapSyncResult {
+  message: string;
+  syncedCount: number;
+  updatedCount: number;
+  totalProcessed: number;
+}
+
 export const api = {
   // Market data
   getMarketTicker: async (): Promise<MarketData> => {
@@ -240,6 +280,22 @@ export const api = {
       'DELETE',
       `/api/scheduled-trades/${scheduledTradeId}`
     );
+    return response.json();
+  },
+
+  // Swap operations
+  getSwaps: async (userId: number): Promise<Swap[]> => {
+    const response = await apiRequest('GET', `/api/swaps/${userId}`);
+    return response.json();
+  },
+
+  executeSwap: async (swapRequest: SwapRequest): Promise<Swap> => {
+    const response = await apiRequest('POST', '/api/swaps/execute', swapRequest);
+    return response.json();
+  },
+
+  syncSwaps: async (userId: number): Promise<SwapSyncResult> => {
+    const response = await apiRequest('POST', '/api/swaps/sync', { userId });
     return response.json();
   },
 };

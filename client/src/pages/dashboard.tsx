@@ -14,6 +14,7 @@ import { Plus, RefreshCw } from 'lucide-react';
 import { useLocation } from 'wouter';
 import UserPage from './user';
 import FuturesPage from './futures';
+import PortfolioPage from './portfolio';
 
 function DashboardContent() {
   return (
@@ -96,7 +97,7 @@ export default function Dashboard() {
       case '/history':
         return <PlaceholderPage title="Trade History" />;
       case '/portfolio':
-        return <PlaceholderPage title="Portfolio" />;
+        return <PortfolioPage />;
       case '/settings':
         return <SettingsContent />;
       default:

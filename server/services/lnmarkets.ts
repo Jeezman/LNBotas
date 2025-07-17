@@ -99,6 +99,30 @@ export interface DepositResponse {
   expiry: number;
 }
 
+export interface SwapRequest {
+  in_asset: 'BTC' | 'USD';
+  out_asset: 'BTC' | 'USD';
+  in_amount?: number; // Amount in satoshis for BTC, cents for USD
+  out_amount?: number; // Amount in satoshis for BTC, cents for USD
+}
+
+export interface SwapResponse {
+  inAsset: string;
+  outAsset: string;
+  inAmount: number;
+  outAmount: number;
+}
+
+export interface SwapHistoryItem {
+  id: string;
+  inAsset: string;
+  outAsset: string;
+  inAmount: number;
+  outAmount: number;
+  rate: number;
+  timestamp: number;
+}
+
 export class LNMarketsService {
   private config: LNMarketsConfig;
   private baseUrl: string;
@@ -436,6 +460,65 @@ export class LNMarketsService {
       return deposit;
     } catch (error) {
       console.error('Error fetching deposit status:', error);
+      throw error;
+    }
+  }
+
+  // Swap operations
+  async executeSwap(swapRequest: SwapRequest): Promise<SwapResponse> {
+    try {
+      console.log('Executing swap via LN Markets API:', swapRequest);
+      
+      // Validate that exactly one amount is specified
+      if ((swapRequest.in_amount && swapRequest.out_amount) || 
+          (!swapRequest.in_amount && !swapRequest.out_amount)) {
+        throw new Error('Must specify exactly one of in_amount or out_amount');
+      }
+
+      // Validate asset pair
+      if (swapRequest.in_asset === swapRequest.out_asset) {
+        throw new Error('Cannot swap between the same asset');
+      }
+
+      const result = await this.makeRequest('POST', '/swap', swapRequest);
+      console.log('Swap execution result:', result);
+      
+      // Transform the response to match our interface
+      const response: SwapResponse = {
+        inAsset: result.in_asset || swapRequest.in_asset,
+        outAsset: result.out_asset || swapRequest.out_asset,
+        inAmount: result.in_amount || swapRequest.in_amount || 0,
+        outAmount: result.out_amount || swapRequest.out_amount || 0,
+      };
+      
+      return response;
+    } catch (error) {
+      console.error('Error executing swap:', error);
+      throw error;
+    }
+  }
+
+  async getSwapHistory(from?: number, to?: number, limit?: number): Promise<SwapHistoryItem[]> {
+    try {
+      console.log('Fetching swap history from LN Markets API');
+      const params = new URLSearchParams();
+      
+      if (from !== undefined && from !== null) {
+        params.append('from', from.toString());
+      }
+      if (to !== undefined && to !== null) {
+        params.append('to', to.toString());
+      }
+      if (limit !== undefined && limit !== null) {
+        params.append('limit', limit.toString());
+      }
+
+      const query = params.toString();
+      const swapHistory = await this.makeRequest('GET', `/swap${query ? '?' + query : ''}`);
+      console.log('Swap history response:', swapHistory);
+      return swapHistory || [];
+    } catch (error) {
+      console.error('Error fetching swap history:', error);
       throw error;
     }
   }

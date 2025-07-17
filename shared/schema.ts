@@ -6,6 +6,7 @@ import {
   boolean,
   decimal,
   timestamp,
+  pgEnum,
 } from 'drizzle-orm/pg-core';
 import { createInsertSchema } from 'drizzle-zod';
 import { z } from 'zod';
@@ -31,6 +32,14 @@ export const scheduledTradeStatusEnum = z.enum([
   'triggered',
   'cancelled',
   'failed',
+]);
+
+// Swap status enum
+export const swapStatusEnum = z.enum([
+  'pending',
+  'completed',
+  'failed',
+  'cancelled',
 ]);
 
 export const users = pgTable('users', {
@@ -139,6 +148,21 @@ export const scheduledTrades = pgTable('scheduled_trades', {
   updatedAt: timestamp('updated_at').defaultNow(),
 });
 
+export const swaps = pgTable('swaps', {
+  id: serial('id').primaryKey(),
+  userId: integer('user_id').notNull(),
+  lnMarketsId: text('ln_markets_id'), // LN Markets swap ID if applicable
+  fromAsset: text('from_asset').notNull(), // 'BTC' | 'USD'
+  toAsset: text('to_asset').notNull(), // 'BTC' | 'USD'
+  fromAmount: integer('from_amount').notNull(), // Amount in satoshis for BTC, cents for USD
+  toAmount: integer('to_amount').notNull(), // Amount in satoshis for BTC, cents for USD
+  exchangeRate: decimal('exchange_rate', { precision: 18, scale: 8 }), // Rate at execution
+  fee: integer('fee').default(0), // Fee in satoshis
+  status: text('status').notNull().default('pending'), // 'pending' | 'completed' | 'failed' | 'cancelled'
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
   password: true,
@@ -185,6 +209,16 @@ export const insertScheduledTradeSchema = createInsertSchema(scheduledTrades)
     triggerType: scheduledTradeTriggerTypeEnum,
   });
 
+export const insertSwapSchema = createInsertSchema(swaps)
+  .omit({
+    id: true,
+    createdAt: true,
+    updatedAt: true,
+  })
+  .extend({
+    status: swapStatusEnum,
+  });
+
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 export type InsertTrade = z.infer<typeof insertTradeSchema>;
@@ -200,6 +234,10 @@ export type ScheduledTradeTriggerType = z.infer<
   typeof scheduledTradeTriggerTypeEnum
 >;
 export type ScheduledTradeStatus = z.infer<typeof scheduledTradeStatusEnum>;
+
+export type InsertSwap = z.infer<typeof insertSwapSchema>;
+export type Swap = typeof swaps.$inferSelect;
+export type SwapStatus = z.infer<typeof swapStatusEnum>;
 
 // Trigger value schemas for different trigger types
 export const dateTriggerSchema = z.object({
