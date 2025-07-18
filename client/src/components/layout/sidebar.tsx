@@ -7,7 +7,9 @@ import {
   Settings, 
   Zap, 
   User, 
-  LogOut 
+  LogOut,
+  Calendar,
+  Clock
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
@@ -18,6 +20,7 @@ const navigation = [
   { name: 'User Profile', href: '/user', icon: User, current: false },
   { name: 'Futures', href: '/futures', icon: Coins, current: false },
   { name: 'Options', href: '/options', icon: PieChart, current: false },
+  { name: 'Schedule Swaps', href: '/schedule-swaps', icon: Clock, current: false },
   { name: 'History', href: '/history', icon: History, current: false },
   { name: 'Portfolio', href: '/portfolio', icon: Briefcase, current: false },
   { name: 'Settings', href: '/settings', icon: Settings, current: false },

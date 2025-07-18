@@ -1,6 +1,7 @@
 import { storage } from '../storage';
 import { createLNMarketsService, type LNMarketsTrade } from './lnmarkets';
-import type { TradeStatus } from '../../shared/schema';
+import type { TradeStatus, ScheduledSwap } from '../../shared/schema';
+import { calendarTriggerSchema, recurringTriggerSchema, marketConditionTriggerSchema } from '../../shared/schema';
 
 // Sync interval in milliseconds (5 minutes)
 const SYNC_INTERVAL = 5 * 60 * 1000;
@@ -535,6 +536,342 @@ async function executeScheduledTrade(scheduledTrade: any) {
   }
 }
 
+// Check and execute scheduled swaps
+async function checkScheduledSwaps() {
+  console.log('🔄 Checking scheduled swaps...');
+
+  try {
+    const activeScheduledSwaps = await storage.getActiveScheduledSwaps();
+    console.log(
+      `👀 Found ${activeScheduledSwaps.length} active scheduled swaps`
+    );
+
+    for (const scheduledSwap of activeScheduledSwaps) {
+      console.log(`⚙️ Processing scheduled swap ${scheduledSwap.id}:`, {
+        scheduleType: scheduledSwap.scheduleType,
+        swapDirection: scheduledSwap.swapDirection,
+        amount: scheduledSwap.amount,
+        status: scheduledSwap.status,
+        triggerConfig: scheduledSwap.triggerConfig,
+      });
+
+      try {
+        const shouldTrigger = await checkScheduledSwapTrigger(scheduledSwap);
+
+        if (shouldTrigger) {
+          console.log(
+            `✅ Scheduled swap ${scheduledSwap.id} SHOULD TRIGGER - executing...`
+          );
+          await executeScheduledSwap(scheduledSwap);
+        } else {
+          console.log(
+            `⏳ Scheduled swap ${scheduledSwap.id} should not trigger yet`
+          );
+        }
+      } catch (error) {
+        console.error(
+          `❌ Error processing scheduled swap ${scheduledSwap.id}:`,
+          error
+        );
+
+        // Create failed execution record
+        await storage.createSwapExecution({
+          scheduledSwapId: scheduledSwap.id,
+          swapId: null,
+          executionTime: new Date(),
+          status: 'failed',
+          failureReason: error instanceof Error ? error.message : 'Unknown error',
+        });
+      }
+    }
+  } catch (error) {
+    console.error('❌ Error checking scheduled swaps:', error);
+  }
+}
+
+async function checkScheduledSwapTrigger(scheduledSwap: ScheduledSwap): Promise<boolean> {
+  try {
+    console.log(`🔍 Checking trigger for swap ${scheduledSwap.id} (${scheduledSwap.scheduleType})`);
+    const triggerConfig = JSON.parse(scheduledSwap.triggerConfig);
+    console.log(`🔍 Parsed trigger config:`, triggerConfig);
+
+    let result: boolean;
+    switch (scheduledSwap.scheduleType) {
+      case 'calendar':
+        result = checkCalendarTrigger(triggerConfig);
+        break;
+      case 'recurring':
+        result = checkRecurringTrigger(triggerConfig);
+        break;
+      case 'market_condition':
+        result = await checkMarketConditionTrigger(triggerConfig);
+        break;
+      default:
+        throw new Error(`Unknown schedule type: ${scheduledSwap.scheduleType}`);
+    }
+    
+    console.log(`🔍 Trigger check result for swap ${scheduledSwap.id}: ${result ? '✅ SHOULD TRIGGER' : '❌ NOT YET'}`);
+    return result;
+  } catch (error) {
+    console.error(`❌ Error parsing trigger config for swap ${scheduledSwap.id}:`, error);
+    return false;
+  }
+}
+
+function checkCalendarTrigger(triggerConfig: any): boolean {
+  try {
+    const config = calendarTriggerSchema.parse(triggerConfig);
+    const triggerDate = new Date(config.dateTime);
+    const now = new Date();
+    const shouldTrigger = now >= triggerDate;
+
+    console.log('📅 Calendar trigger check:', {
+      triggerDate: triggerDate.toISOString(),
+      now: now.toISOString(),
+      shouldTrigger,
+    });
+
+    return shouldTrigger;
+  } catch (error) {
+    console.error('Error in calendar trigger check:', error);
+    return false;
+  }
+}
+
+function checkRecurringTrigger(triggerConfig: any): boolean {
+  try {
+    const config = recurringTriggerSchema.parse(triggerConfig);
+    const now = new Date();
+    
+    console.log('🔁 Recurring trigger check:', {
+      interval: config.interval,
+      targetHour: config.hour,
+      targetMinute: config.minute,
+      currentTime: now.toISOString(),
+      currentHour: now.getHours(),
+      currentMinute: now.getMinutes(),
+      dayOfWeek: config.dayOfWeek,
+      dayOfMonth: config.dayOfMonth,
+      startDate: config.startDate,
+      endDate: config.endDate,
+    });
+    
+    // Check if we're within the date range (if specified)
+    if (config.startDate && new Date(config.startDate) > now) {
+      console.log('❌ Recurring trigger: Before start date');
+      return false;
+    }
+    if (config.endDate && new Date(config.endDate) < now) {
+      console.log('❌ Recurring trigger: After end date');
+      return false;
+    }
+
+    const currentHour = now.getHours();
+    const currentMinute = now.getMinutes();
+    const targetHour = config.hour;
+    const targetMinute = config.minute;
+
+    // Check if we're at the right time of day (within 5 minute window)
+    const timeDiffMinutes = Math.abs((currentHour * 60 + currentMinute) - (targetHour * 60 + targetMinute));
+    if (timeDiffMinutes > 5) {
+      console.log(`❌ Recurring trigger: Time difference ${timeDiffMinutes} minutes > 5 minute window`);
+      return false;
+    }
+
+    switch (config.interval) {
+      case 'daily':
+        console.log('✅ Recurring trigger: Daily time match');
+        return true; // If time matches, trigger daily
+      case 'weekly':
+        const currentDayOfWeek = now.getDay();
+        const weeklyMatch = config.dayOfWeek === currentDayOfWeek;
+        console.log(`🔁 Recurring trigger: Weekly - current day ${currentDayOfWeek}, target day ${config.dayOfWeek}, match: ${weeklyMatch}`);
+        return weeklyMatch;
+      case 'monthly':
+        const currentDayOfMonth = now.getDate();
+        const monthlyMatch = config.dayOfMonth === currentDayOfMonth;
+        console.log(`🔁 Recurring trigger: Monthly - current day ${currentDayOfMonth}, target day ${config.dayOfMonth}, match: ${monthlyMatch}`);
+        return monthlyMatch;
+      default:
+        console.log(`❌ Recurring trigger: Unknown interval "${config.interval}"`);
+        return false;
+    }
+  } catch (error) {
+    console.error('❌ Error in recurring trigger check:', error);
+    return false;
+  }
+}
+
+async function checkMarketConditionTrigger(triggerConfig: any): Promise<boolean> {
+  try {
+    const config = marketConditionTriggerSchema.parse(triggerConfig);
+    
+    // Get current market price
+    const marketData = await storage.getMarketData('BTC/USD');
+    if (!marketData?.lastPrice) {
+      console.error('❌ Market condition trigger: No market data available');
+      throw new Error('No market data available');
+    }
+
+    const currentPrice = parseFloat(marketData.lastPrice);
+    
+    console.log('📊 Market condition trigger check:', {
+      condition: config.condition,
+      currentPrice,
+      targetPrice: config.targetPrice,
+      minPrice: config.minPrice,
+      maxPrice: config.maxPrice,
+      percentage: config.percentage,
+      basePrice: config.basePrice,
+    });
+
+    // Handle percentage-based conditions
+    if (config.percentage !== undefined && config.basePrice !== undefined) {
+      const targetPrice = config.basePrice * (1 + config.percentage / 100);
+      const shouldTrigger = config.percentage > 0 
+        ? currentPrice >= targetPrice  // Positive percentage - trigger when price goes up
+        : currentPrice <= targetPrice; // Negative percentage - trigger when price goes down
+      
+      console.log('📊 Percentage trigger evaluation:', {
+        basePrice: config.basePrice,
+        percentage: config.percentage,
+        targetPrice,
+        currentPrice,
+        shouldTrigger,
+      });
+      
+      return shouldTrigger;
+    }
+
+    // Handle absolute price conditions
+    switch (config.condition) {
+      case 'above':
+        if (!config.targetPrice) {
+          console.log('❌ Market condition trigger: "above" condition missing targetPrice');
+          return false;
+        }
+        const aboveResult = currentPrice >= config.targetPrice;
+        console.log(`📊 Above trigger: ${currentPrice} >= ${config.targetPrice} = ${aboveResult}`);
+        return aboveResult;
+      case 'below':
+        if (!config.targetPrice) {
+          console.log('❌ Market condition trigger: "below" condition missing targetPrice');
+          return false;
+        }
+        const belowResult = currentPrice <= config.targetPrice;
+        console.log(`📊 Below trigger: ${currentPrice} <= ${config.targetPrice} = ${belowResult}`);
+        return belowResult;
+      case 'between':
+        if (!config.minPrice || !config.maxPrice) {
+          console.log('❌ Market condition trigger: "between" condition missing minPrice or maxPrice');
+          return false;
+        }
+        const betweenResult = currentPrice >= config.minPrice && currentPrice <= config.maxPrice;
+        console.log(`📊 Between trigger: ${config.minPrice} <= ${currentPrice} <= ${config.maxPrice} = ${betweenResult}`);
+        return betweenResult;
+      default:
+        console.log(`❌ Market condition trigger: Unknown condition "${config.condition}"`);
+        return false;
+    }
+  } catch (error) {
+    console.error('❌ Error in market condition trigger check:', error);
+    return false;
+  }
+}
+
+async function executeScheduledSwap(scheduledSwap: ScheduledSwap) {
+  console.log(`🔄 Executing scheduled swap ${scheduledSwap.id}...`);
+
+  try {
+    // Get user's API credentials
+    const user = await storage.getUser(scheduledSwap.userId);
+    if (!user || !user.apiKey || !user.apiSecret || !user.apiPassphrase) {
+      throw new Error('User API credentials not configured');
+    }
+
+    // Create LN Markets service instance
+    const lnMarketsService = createLNMarketsService({
+      apiKey: user.apiKey,
+      secret: user.apiSecret,
+      passphrase: user.apiPassphrase,
+      network: 'mainnet',
+    });
+
+    // Determine swap parameters
+    const [fromAsset, toAsset] = scheduledSwap.swapDirection === 'btc_to_usd' 
+      ? ['BTC', 'USD'] 
+      : ['USD', 'BTC'];
+
+    // Execute swap via LN Markets
+    const swapRequest = {
+      in_asset: fromAsset as 'BTC' | 'USD',
+      out_asset: toAsset as 'BTC' | 'USD',
+      in_amount: parseFloat(scheduledSwap.amount),
+    };
+
+    const swapResult = await lnMarketsService.executeSwap(swapRequest);
+
+    // Get current BTC price as the exchange rate
+    const marketTicker = await lnMarketsService.getFuturesTicker();
+    const exchangeRate = marketTicker.lastPrice;
+
+    // Store swap in database
+    const swap = await storage.createSwap({
+      userId: scheduledSwap.userId,
+      fromAsset,
+      toAsset,
+      fromAmount: swapRequest.in_amount.toString(),
+      toAmount: (swapResult.outAmount || 0).toString(),
+      exchangeRate: exchangeRate.toString(),
+      status: 'completed',
+      fee: '0',
+    });
+
+    // Create successful execution record
+    const swapExecution = await storage.createSwapExecution({
+      scheduledSwapId: scheduledSwap.id,
+      swapId: swap.id,
+      executionTime: new Date(),
+      status: 'success',
+    });
+
+    // For one-time schedules, mark as completed
+    if (scheduledSwap.scheduleType === 'calendar' || scheduledSwap.scheduleType === 'market_condition') {
+      await storage.updateScheduledSwap(scheduledSwap.id, {
+        status: 'completed',
+      });
+      console.log(`✅ Marked scheduled swap ${scheduledSwap.id} as completed (${scheduledSwap.scheduleType})`);
+    } else if (scheduledSwap.scheduleType === 'recurring') {
+      console.log(`🔄 Keeping scheduled swap ${scheduledSwap.id} active for future executions (recurring)`);
+    }
+
+    // Sync user balance after swap
+    await syncUserBalance(scheduledSwap.userId);
+
+    console.log(
+      `✅ Scheduled swap ${scheduledSwap.id} executed successfully as swap ${swap.id}`
+    );
+
+    return { swap, execution: swapExecution };
+  } catch (error) {
+    console.error(
+      `❌ Failed to execute scheduled swap ${scheduledSwap.id}:`,
+      error
+    );
+
+    // Create failed execution record
+    await storage.createSwapExecution({
+      scheduledSwapId: scheduledSwap.id,
+      swapId: null,
+      executionTime: new Date(),
+      status: 'failed',
+      failureReason: error instanceof Error ? error.message : 'Unknown error',
+    });
+
+    throw error;
+  }
+}
+
 export function startPeriodicSync() {
   console.log('🔄 [SYNC SCHEDULER] Starting periodic sync service');
 
@@ -566,8 +903,12 @@ export function startScheduler() {
   // Check scheduled trades every five minutes
   setInterval(checkScheduledTrades, 5 * 60 * 1000);
 
-  // Initial check
-  checkScheduledTrades();
+  // Check scheduled swaps every five minutes
+  setInterval(checkScheduledSwaps, 5 * 60 * 1000);
 
-  // ... existing sync intervals ...
+  // Initial checks
+  checkScheduledTrades();
+  checkScheduledSwaps();
+
+  console.log('🔄 Scheduler started - checking both scheduled trades and swaps every 5 minutes');
 }

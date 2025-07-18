@@ -6,3 +6,5 @@ vite.config.ts.*
 *.tar.gz
 .env
 .claude/sessions
+features.md
+todos.md

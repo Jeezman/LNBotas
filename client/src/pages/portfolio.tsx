@@ -35,10 +35,10 @@ export default function PortfolioPage() {
   const totalSwapVolume = completedSwaps.reduce((sum, swap) => {
     // Calculate volume in USD
     if (swap.fromAsset === 'BTC') {
-      const btcAmount = swap.fromAmount / 100000000;
+      const btcAmount = Number(swap.fromAmount) / 100000000;
       return sum + (btcAmount * marketPrice);
     } else {
-      return sum + (swap.fromAmount);
+      return sum + (Number(swap.fromAmount));
     }
   }, 0);
 
@@ -158,13 +158,13 @@ export default function PortfolioPage() {
                       <div className="text-sm font-mono">
                         {swap.fromAsset === 'BTC' 
                           ? `${swap.fromAmount.toLocaleString()} sats`
-                          : `$${(swap.fromAmount).toFixed(2)}`
+                          : `$${(swap.fromAmount)}`
                         }
                       </div>
                       <div className="text-xs text-muted-foreground">
                         → {swap.toAsset === 'BTC' 
                           ? `${swap.toAmount.toLocaleString()} sats`
-                          : `$${(swap.toAmount).toFixed(2)}`
+                          : `$${(swap.toAmount)}`
                         }
                       </div>
                     </div>

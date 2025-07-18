@@ -11,6 +11,11 @@ import {
   dateTriggerSchema,
   priceRangeTriggerSchema,
   pricePercentageTriggerSchema,
+  insertScheduledSwapSchema,
+  insertSwapExecutionSchema,
+  calendarTriggerSchema,
+  recurringTriggerSchema,
+  marketConditionTriggerSchema,
 } from '@shared/schema';
 import {
   createLNMarketsService,
@@ -1732,11 +1737,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         userId,
         fromAsset,
         toAsset,
-        fromAmount: inAmount,
-        toAmount: outAmount,
+        fromAmount: inAmount.toString(),
+        toAmount: outAmount.toString(),
         exchangeRate: exchangeRate.toString(),
         status: 'completed',
-        fee: 0, // LN Markets doesn't charge explicit fees for swaps
+        fee: '0', // LN Markets doesn't charge explicit fees for swaps
       });
 
       // Sync user balance after swap
@@ -1810,11 +1815,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             lnMarketsId: lnSwap.id,
             fromAsset: lnSwap.inAsset,
             toAsset: lnSwap.outAsset,
-            fromAmount: lnSwap.inAmount,
-            toAmount: lnSwap.outAmount,
+            fromAmount: lnSwap.inAmount.toString(),
+            toAmount: lnSwap.outAmount.toString(),
             exchangeRate: exchangeRate.toString(),
             status: 'completed',
-            fee: 0, // LN Markets doesn't charge explicit fees for swaps
+            fee: '0', // LN Markets doesn't charge explicit fees for swaps
           });
           syncedCount++;
         }
@@ -1835,6 +1840,325 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       logError(req, 'Swap sync failed', error);
       res.status(500).json({ message: 'Failed to sync swaps from LN Markets' });
+    }
+  });
+
+  // Scheduled swap endpoints
+  app.get('/api/scheduled-swaps/:userId', async (req, res) => {
+    logRequest(req, 'Fetching user scheduled swaps', { userId: req.params.userId });
+    try {
+      const userId = parseInt(req.params.userId);
+      const scheduledSwaps = await storage.getScheduledSwapsByUserId(userId);
+      logSuccess(req, 'User scheduled swaps retrieved', { count: scheduledSwaps.length });
+      res.json(scheduledSwaps);
+    } catch (error) {
+      logError(req, 'Failed to fetch user scheduled swaps', error);
+      res.status(500).json({ message: 'Failed to fetch scheduled swaps' });
+    }
+  });
+
+  app.post('/api/scheduled-swaps', async (req, res) => {
+    logRequest(req, 'Creating scheduled swap', req.body);
+    try {
+      const { userId, scheduleType, swapDirection, amount, triggerConfig, name, description } = req.body;
+
+      // Validate required fields
+      if (!userId || !scheduleType || !swapDirection || !amount || !triggerConfig) {
+        return res.status(400).json({
+          message: 'userId, scheduleType, swapDirection, amount, and triggerConfig are required'
+        });
+      }
+
+      // Validate schedule type
+      if (!['calendar', 'recurring', 'market_condition'].includes(scheduleType)) {
+        return res.status(400).json({
+          message: 'Invalid schedule type. Must be calendar, recurring, or market_condition'
+        });
+      }
+
+      // Validate swap direction
+      if (!['btc_to_usd', 'usd_to_btc'].includes(swapDirection)) {
+        return res.status(400).json({
+          message: 'Invalid swap direction. Must be btc_to_usd or usd_to_btc'
+        });
+      }
+
+      // Validate trigger configuration based on schedule type
+      let parsedTriggerConfig;
+      try {
+        switch (scheduleType) {
+          case 'calendar':
+            parsedTriggerConfig = calendarTriggerSchema.parse(triggerConfig);
+            break;
+          case 'recurring':
+            parsedTriggerConfig = recurringTriggerSchema.parse(triggerConfig);
+            break;
+          case 'market_condition':
+            parsedTriggerConfig = marketConditionTriggerSchema.parse(triggerConfig);
+            break;
+          default:
+            throw new Error('Invalid schedule type');
+        }
+      } catch (validationError) {
+        return res.status(400).json({
+          message: 'Invalid trigger configuration',
+          error: validationError instanceof Error ? validationError.message : 'Unknown error'
+        });
+      }
+
+      // Check if user exists
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+
+      // Create scheduled swap
+      const scheduledSwap = await storage.createScheduledSwap({
+        userId,
+        scheduleType,
+        swapDirection,
+        amount: amount.toString(),
+        triggerConfig: JSON.stringify(parsedTriggerConfig),
+        name: name || null,
+        description: description || null,
+        status: 'active',
+      });
+
+      logSuccess(req, 'Scheduled swap created successfully', { 
+        scheduledSwapId: scheduledSwap.id,
+        scheduleType,
+        swapDirection,
+        amount 
+      });
+
+      res.json(scheduledSwap);
+    } catch (error) {
+      logError(req, 'Failed to create scheduled swap', error);
+      res.status(500).json({ 
+        message: 'Failed to create scheduled swap',
+        detail: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
+  app.put('/api/scheduled-swaps/:id', async (req, res) => {
+    logRequest(req, 'Updating scheduled swap', { id: req.params.id, updates: req.body });
+    try {
+      const scheduledSwapId = parseInt(req.params.id);
+      const { name, description, status, triggerConfig } = req.body;
+
+      // Get existing scheduled swap
+      const existingScheduledSwap = await storage.getScheduledSwap(scheduledSwapId);
+      if (!existingScheduledSwap) {
+        return res.status(404).json({ message: 'Scheduled swap not found' });
+      }
+
+      // Only allow updates if the scheduled swap is active or paused
+      if (!['active', 'paused'].includes(existingScheduledSwap.status)) {
+        return res.status(400).json({
+          message: 'Cannot update scheduled swap that is completed or cancelled'
+        });
+      }
+
+      // Validate trigger configuration if provided
+      let parsedTriggerConfig;
+      if (triggerConfig) {
+        try {
+          switch (existingScheduledSwap.scheduleType) {
+            case 'calendar':
+              parsedTriggerConfig = calendarTriggerSchema.parse(triggerConfig);
+              break;
+            case 'recurring':
+              parsedTriggerConfig = recurringTriggerSchema.parse(triggerConfig);
+              break;
+            case 'market_condition':
+              parsedTriggerConfig = marketConditionTriggerSchema.parse(triggerConfig);
+              break;
+            default:
+              throw new Error('Invalid schedule type');
+          }
+        } catch (validationError) {
+          return res.status(400).json({
+            message: 'Invalid trigger configuration',
+            error: validationError instanceof Error ? validationError.message : 'Unknown error'
+          });
+        }
+      }
+
+      // Update scheduled swap
+      const updatedScheduledSwap = await storage.updateScheduledSwap(scheduledSwapId, {
+        name: name !== undefined ? name : existingScheduledSwap.name,
+        description: description !== undefined ? description : existingScheduledSwap.description,
+        status: status !== undefined ? status : existingScheduledSwap.status,
+        triggerConfig: parsedTriggerConfig ? JSON.stringify(parsedTriggerConfig) : existingScheduledSwap.triggerConfig,
+      });
+
+      logSuccess(req, 'Scheduled swap updated successfully', { scheduledSwapId });
+      res.json(updatedScheduledSwap);
+    } catch (error) {
+      logError(req, 'Failed to update scheduled swap', error);
+      res.status(500).json({ 
+        message: 'Failed to update scheduled swap',
+        detail: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
+  app.delete('/api/scheduled-swaps/:id', async (req, res) => {
+    logRequest(req, 'Deleting scheduled swap', { id: req.params.id });
+    try {
+      const scheduledSwapId = parseInt(req.params.id);
+
+      // Get existing scheduled swap
+      const existingScheduledSwap = await storage.getScheduledSwap(scheduledSwapId);
+      if (!existingScheduledSwap) {
+        return res.status(404).json({ message: 'Scheduled swap not found' });
+      }
+
+      // Only allow deletion if the scheduled swap is active or paused
+      if (!['active', 'paused'].includes(existingScheduledSwap.status)) {
+        return res.status(400).json({
+          message: 'Cannot delete scheduled swap that is completed or cancelled'
+        });
+      }
+
+      // Mark as cancelled instead of deleting
+      await storage.updateScheduledSwap(scheduledSwapId, { status: 'cancelled' });
+
+      logSuccess(req, 'Scheduled swap cancelled successfully', { scheduledSwapId });
+      res.json({ message: 'Scheduled swap cancelled successfully' });
+    } catch (error) {
+      logError(req, 'Failed to cancel scheduled swap', error);
+      res.status(500).json({ 
+        message: 'Failed to cancel scheduled swap',
+        detail: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
+  app.get('/api/scheduled-swaps/:id/executions', async (req, res) => {
+    logRequest(req, 'Fetching scheduled swap executions', { id: req.params.id });
+    try {
+      const scheduledSwapId = parseInt(req.params.id);
+      const executions = await storage.getSwapExecutionsByScheduledSwapId(scheduledSwapId);
+      logSuccess(req, 'Scheduled swap executions retrieved', { count: executions.length });
+      res.json(executions);
+    } catch (error) {
+      logError(req, 'Failed to fetch scheduled swap executions', error);
+      res.status(500).json({ message: 'Failed to fetch executions' });
+    }
+  });
+
+  app.post('/api/scheduled-swaps/:id/execute', async (req, res) => {
+    logRequest(req, 'Manually executing scheduled swap', { id: req.params.id });
+    try {
+      const scheduledSwapId = parseInt(req.params.id);
+
+      // Get scheduled swap
+      const scheduledSwap = await storage.getScheduledSwap(scheduledSwapId);
+      if (!scheduledSwap) {
+        return res.status(404).json({ message: 'Scheduled swap not found' });
+      }
+
+      // Check if scheduled swap is active
+      if (scheduledSwap.status !== 'active') {
+        return res.status(400).json({
+          message: 'Cannot execute scheduled swap that is not active'
+        });
+      }
+
+      // Get user's API credentials
+      const user = await storage.getUser(scheduledSwap.userId);
+      if (!user || !user.apiKey || !user.apiSecret || !user.apiPassphrase) {
+        return res.status(400).json({
+          message: 'User API credentials not configured'
+        });
+      }
+
+      // Create LN Markets service instance
+      const lnMarketsService = createLNMarketsService({
+        apiKey: user.apiKey,
+        secret: user.apiSecret,
+        passphrase: user.apiPassphrase,
+        network: 'mainnet',
+      });
+
+      try {
+        // Determine swap parameters
+        const [fromAsset, toAsset] = scheduledSwap.swapDirection === 'btc_to_usd' 
+          ? ['BTC', 'USD'] 
+          : ['USD', 'BTC'];
+
+        // Execute swap via LN Markets
+        const swapRequest = {
+          in_asset: fromAsset as 'BTC' | 'USD',
+          out_asset: toAsset as 'BTC' | 'USD',
+          in_amount: parseFloat(scheduledSwap.amount),
+        };
+
+        const swapResult = await lnMarketsService.executeSwap(swapRequest);
+
+        // Get current BTC price as the exchange rate
+        const marketTicker = await lnMarketsService.getFuturesTicker();
+        const exchangeRate = marketTicker.lastPrice;
+
+        // Store swap in database
+        const swap = await storage.createSwap({
+          userId: scheduledSwap.userId,
+          fromAsset,
+          toAsset,
+          fromAmount: swapRequest.in_amount.toString(),
+          toAmount: (swapResult.outAmount || 0).toString(),
+          exchangeRate: exchangeRate.toString(),
+          status: 'completed',
+          fee: '0',
+        });
+
+        // Create swap execution record
+        const swapExecution = await storage.createSwapExecution({
+          scheduledSwapId: scheduledSwap.id,
+          swapId: swap.id,
+          executionTime: new Date(),
+          status: 'success',
+        });
+
+        // Sync user balance after swap
+        await syncUserBalance(scheduledSwap.userId);
+
+        logSuccess(req, 'Scheduled swap executed successfully', {
+          scheduledSwapId: scheduledSwap.id,
+          swapId: swap.id,
+          executionId: swapExecution.id
+        });
+
+        res.json({
+          message: 'Scheduled swap executed successfully',
+          swap,
+          execution: swapExecution
+        });
+      } catch (swapError) {
+        // Create failed execution record
+        const swapExecution = await storage.createSwapExecution({
+          scheduledSwapId: scheduledSwap.id,
+          swapId: null,
+          executionTime: new Date(),
+          status: 'failed',
+          failureReason: swapError instanceof Error ? swapError.message : 'Unknown error',
+        });
+
+        logError(req, 'Scheduled swap execution failed', swapError);
+        res.status(500).json({
+          message: 'Scheduled swap execution failed',
+          execution: swapExecution,
+          error: swapError instanceof Error ? swapError.message : 'Unknown error'
+        });
+      }
+    } catch (error) {
+      logError(req, 'Failed to execute scheduled swap', error);
+      res.status(500).json({
+        message: 'Failed to execute scheduled swap',
+        detail: error instanceof Error ? error.message : 'Unknown error'
+      });
     }
   });
 

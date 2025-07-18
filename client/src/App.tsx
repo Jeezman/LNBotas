@@ -65,6 +65,11 @@ function Router() {
           <Dashboard />
         </ProtectedRoute>
       </Route>
+      <Route path="/schedule-swaps">
+        <ProtectedRoute>
+          <Dashboard />
+        </ProtectedRoute>
+      </Route>
       <Route component={NotFound} />
     </Switch>
   );

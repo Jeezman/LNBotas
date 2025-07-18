@@ -3,10 +3,8 @@ import {
   text,
   serial,
   integer,
-  boolean,
   decimal,
   timestamp,
-  pgEnum,
 } from 'drizzle-orm/pg-core';
 import { createInsertSchema } from 'drizzle-zod';
 import { z } from 'zod';
@@ -154,13 +152,59 @@ export const swaps = pgTable('swaps', {
   lnMarketsId: text('ln_markets_id'), // LN Markets swap ID if applicable
   fromAsset: text('from_asset').notNull(), // 'BTC' | 'USD'
   toAsset: text('to_asset').notNull(), // 'BTC' | 'USD'
-  fromAmount: integer('from_amount').notNull(), // Amount in satoshis for BTC, cents for USD
-  toAmount: integer('to_amount').notNull(), // Amount in satoshis for BTC, cents for USD
+  fromAmount: decimal('from_amount', { precision: 20, scale: 8 }).notNull(), // Amount in BTC or USD (decimal values)
+  toAmount: decimal('to_amount', { precision: 20, scale: 8 }).notNull(), // Amount in BTC or USD (decimal values)
   exchangeRate: decimal('exchange_rate', { precision: 18, scale: 8 }), // Rate at execution
-  fee: integer('fee').default(0), // Fee in satoshis
+  fee: decimal('fee', { precision: 20, scale: 8 }).default('0'), // Fee in BTC or USD (decimal values)
   status: text('status').notNull().default('pending'), // 'pending' | 'completed' | 'failed' | 'cancelled'
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+// Scheduled swap schedule type enum
+export const scheduledSwapScheduleTypeEnum = z.enum([
+  'calendar',
+  'recurring',
+  'market_condition',
+]);
+
+// Scheduled swap status enum
+export const scheduledSwapStatusEnum = z.enum([
+  'active',
+  'paused',
+  'completed',
+  'cancelled',
+]);
+
+// Swap execution status enum
+export const swapExecutionStatusEnum = z.enum([
+  'success',
+  'failed',
+  'cancelled',
+]);
+
+export const scheduledSwaps = pgTable('scheduled_swaps', {
+  id: serial('id').primaryKey(),
+  userId: integer('user_id').notNull(),
+  scheduleType: text('schedule_type').notNull(), // 'calendar' | 'recurring' | 'market_condition'
+  swapDirection: text('swap_direction').notNull(), // 'btc_to_usd' | 'usd_to_btc'
+  amount: decimal('amount', { precision: 20, scale: 8 }).notNull(), // Amount to swap
+  triggerConfig: text('trigger_config').notNull(), // JSON string with trigger configuration
+  status: text('status').notNull().default('active'), // 'active' | 'paused' | 'completed' | 'cancelled'
+  name: text('name'), // Optional name for the schedule
+  description: text('description'), // Optional description
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+export const swapExecutions = pgTable('swap_executions', {
+  id: serial('id').primaryKey(),
+  scheduledSwapId: integer('scheduled_swap_id').notNull(),
+  swapId: integer('swap_id'), // Links to successful swap record
+  executionTime: timestamp('execution_time').notNull(),
+  status: text('status').notNull(), // 'success' | 'failed' | 'cancelled'
+  failureReason: text('failure_reason'), // Only populated if status is 'failed'
+  createdAt: timestamp('created_at').defaultNow(),
 });
 
 export const insertUserSchema = createInsertSchema(users).pick({
@@ -219,6 +263,26 @@ export const insertSwapSchema = createInsertSchema(swaps)
     status: swapStatusEnum,
   });
 
+export const insertScheduledSwapSchema = createInsertSchema(scheduledSwaps)
+  .omit({
+    id: true,
+    createdAt: true,
+    updatedAt: true,
+  })
+  .extend({
+    scheduleType: scheduledSwapScheduleTypeEnum,
+    status: scheduledSwapStatusEnum,
+  });
+
+export const insertSwapExecutionSchema = createInsertSchema(swapExecutions)
+  .omit({
+    id: true,
+    createdAt: true,
+  })
+  .extend({
+    status: swapExecutionStatusEnum,
+  });
+
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 export type InsertTrade = z.infer<typeof insertTradeSchema>;
@@ -239,6 +303,15 @@ export type InsertSwap = z.infer<typeof insertSwapSchema>;
 export type Swap = typeof swaps.$inferSelect;
 export type SwapStatus = z.infer<typeof swapStatusEnum>;
 
+export type InsertScheduledSwap = z.infer<typeof insertScheduledSwapSchema>;
+export type ScheduledSwap = typeof scheduledSwaps.$inferSelect;
+export type ScheduledSwapScheduleType = z.infer<typeof scheduledSwapScheduleTypeEnum>;
+export type ScheduledSwapStatus = z.infer<typeof scheduledSwapStatusEnum>;
+
+export type InsertSwapExecution = z.infer<typeof insertSwapExecutionSchema>;
+export type SwapExecution = typeof swapExecutions.$inferSelect;
+export type SwapExecutionStatus = z.infer<typeof swapExecutionStatusEnum>;
+
 // Trigger value schemas for different trigger types
 export const dateTriggerSchema = z.object({
   dateTime: z.string(), // ISO string
@@ -252,6 +325,31 @@ export const priceRangeTriggerSchema = z.object({
 export const pricePercentageTriggerSchema = z.object({
   percentage: z.number(), // e.g., 5 for +5%, -5 for -5%
   basePrice: z.number(), // price when scheduled
+});
+
+// Trigger schemas for scheduled swaps
+export const calendarTriggerSchema = z.object({
+  dateTime: z.string(), // ISO string for specific date/time
+  timezone: z.string().optional(), // Optional timezone
+});
+
+export const recurringTriggerSchema = z.object({
+  interval: z.enum(['daily', 'weekly', 'monthly']),
+  dayOfWeek: z.number().min(0).max(6).optional(), // For weekly (0 = Sunday)
+  dayOfMonth: z.number().min(1).max(31).optional(), // For monthly
+  hour: z.number().min(0).max(23).default(12), // Hour of day (24h format)
+  minute: z.number().min(0).max(59).default(0), // Minute of hour
+  startDate: z.string().optional(), // When to start the recurring schedule
+  endDate: z.string().optional(), // When to end the recurring schedule
+});
+
+export const marketConditionTriggerSchema = z.object({
+  condition: z.enum(['above', 'below', 'between']),
+  targetPrice: z.number().optional(), // For 'above' or 'below'
+  minPrice: z.number().optional(), // For 'between'
+  maxPrice: z.number().optional(), // For 'between'
+  percentage: z.number().optional(), // Alternative: percentage change from current price
+  basePrice: z.number().optional(), // Base price for percentage calculation
 });
 
 export type TradeStatus = z.infer<typeof tradeStatusEnum>;

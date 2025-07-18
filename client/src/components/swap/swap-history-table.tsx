@@ -38,7 +38,7 @@ export function SwapHistoryTable({ showSyncButton = true }: SwapHistoryTableProp
       return `${amount.toLocaleString()} sats`;
     } else {
       // Convert cents to USD
-      return `$${(amount).toFixed(2)}`;
+      return `$${(amount)}`;
     }
   };
 

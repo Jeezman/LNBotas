@@ -8,6 +8,7 @@ import { QuickActions } from '@/components/trading/quick-actions';
 import { ScheduledTrades } from '@/components/trading/scheduled-trades';
 import { ScheduledTradeForm } from '@/components/trading/scheduled-trade-form';
 import { SettingsContent } from '@/components/settings/settings-content';
+import { ScheduleSwapsPage } from '@/components/schedule-swaps/schedule-swaps-page';
 import { useUser, useUpdateMarketData, useSyncBalance } from '@/hooks/use-trading';
 import { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
@@ -82,6 +83,8 @@ export default function Dashboard() {
         return 'Portfolio';
       case '/settings':
         return 'Settings';
+      case '/schedule-swaps':
+        return 'Schedule Swaps';
       default:
         return 'Trading Dashboard';
     }
@@ -101,6 +104,8 @@ export default function Dashboard() {
         return <PortfolioPage />;
       case '/settings':
         return <SettingsContent />;
+      case '/schedule-swaps':
+        return <ScheduleSwapsPage />;
       default:
         return <DashboardContent />;
     }

@@ -5,6 +5,8 @@ import {
   deposits,
   scheduledTrades,
   swaps,
+  scheduledSwaps,
+  swapExecutions,
   type User,
   type InsertUser,
   type Trade,
@@ -17,6 +19,10 @@ import {
   type InsertScheduledTrade,
   type Swap,
   type InsertSwap,
+  type ScheduledSwap,
+  type InsertScheduledSwap,
+  type SwapExecution,
+  type InsertSwapExecution,
 } from '@shared/schema';
 import { db } from './db';
 import { eq, and, or } from 'drizzle-orm';
@@ -76,6 +82,27 @@ export interface IStorage {
     updates: Partial<Swap>
   ): Promise<Swap | undefined>;
   deleteSwap(id: number): Promise<boolean>;
+
+  // Scheduled swap operations
+  getScheduledSwap(id: number): Promise<ScheduledSwap | undefined>;
+  getScheduledSwapsByUserId(userId: number): Promise<ScheduledSwap[]>;
+  getActiveScheduledSwaps(): Promise<ScheduledSwap[]>;
+  createScheduledSwap(scheduledSwap: InsertScheduledSwap): Promise<ScheduledSwap>;
+  updateScheduledSwap(
+    id: number,
+    updates: Partial<ScheduledSwap>
+  ): Promise<ScheduledSwap | undefined>;
+  deleteScheduledSwap(id: number): Promise<boolean>;
+
+  // Swap execution operations
+  getSwapExecution(id: number): Promise<SwapExecution | undefined>;
+  getSwapExecutionsByScheduledSwapId(scheduledSwapId: number): Promise<SwapExecution[]>;
+  createSwapExecution(swapExecution: InsertSwapExecution): Promise<SwapExecution>;
+  updateSwapExecution(
+    id: number,
+    updates: Partial<SwapExecution>
+  ): Promise<SwapExecution | undefined>;
+  deleteSwapExecution(id: number): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
@@ -85,12 +112,16 @@ export class MemStorage implements IStorage {
   private marketData: Map<string, MarketData>;
   private deposits: Map<number, Deposit>;
   private swaps: Map<number, Swap>;
+  private scheduledSwaps: Map<number, ScheduledSwap>;
+  private swapExecutions: Map<number, SwapExecution>;
   private currentUserId: number;
   private currentTradeId: number;
   private currentScheduledTradeId: number;
   private currentMarketDataId: number;
   private currentDepositId: number;
   private currentSwapId: number;
+  private currentScheduledSwapId: number;
+  private currentSwapExecutionId: number;
 
   constructor() {
     this.users = new Map();
@@ -99,12 +130,16 @@ export class MemStorage implements IStorage {
     this.marketData = new Map();
     this.deposits = new Map();
     this.swaps = new Map();
+    this.scheduledSwaps = new Map();
+    this.swapExecutions = new Map();
     this.currentUserId = 1;
     this.currentTradeId = 1;
     this.currentScheduledTradeId = 1;
     this.currentMarketDataId = 1;
     this.currentDepositId = 1;
     this.currentSwapId = 1;
+    this.currentScheduledSwapId = 1;
+    this.currentSwapExecutionId = 1;
 
     // Create demo user
     this.createDemoUser();
@@ -425,7 +460,7 @@ export class MemStorage implements IStorage {
       lnMarketsId: insertSwap.lnMarketsId || null,
       exchangeRate: insertSwap.exchangeRate || null,
       status: insertSwap.status || 'pending',
-      fee: insertSwap.fee || 0,
+      fee: insertSwap.fee || '0',
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -451,6 +486,107 @@ export class MemStorage implements IStorage {
 
   async deleteSwap(id: number): Promise<boolean> {
     return this.swaps.delete(id);
+  }
+
+  // Scheduled swap operations
+  async getScheduledSwap(id: number): Promise<ScheduledSwap | undefined> {
+    return this.scheduledSwaps.get(id);
+  }
+
+  async getScheduledSwapsByUserId(userId: number): Promise<ScheduledSwap[]> {
+    return Array.from(this.scheduledSwaps.values()).filter(
+      (scheduledSwap) => scheduledSwap.userId === userId
+    );
+  }
+
+  async getActiveScheduledSwaps(): Promise<ScheduledSwap[]> {
+    return Array.from(this.scheduledSwaps.values()).filter(
+      (scheduledSwap) => scheduledSwap.status === 'active'
+    );
+  }
+
+  async createScheduledSwap(insertScheduledSwap: InsertScheduledSwap): Promise<ScheduledSwap> {
+    const id = this.currentScheduledSwapId++;
+    const scheduledSwap: ScheduledSwap = {
+      id,
+      userId: insertScheduledSwap.userId,
+      scheduleType: insertScheduledSwap.scheduleType,
+      swapDirection: insertScheduledSwap.swapDirection,
+      amount: insertScheduledSwap.amount,
+      triggerConfig: insertScheduledSwap.triggerConfig,
+      status: insertScheduledSwap.status || 'active',
+      name: insertScheduledSwap.name || null,
+      description: insertScheduledSwap.description || null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.scheduledSwaps.set(id, scheduledSwap);
+    return scheduledSwap;
+  }
+
+  async updateScheduledSwap(
+    id: number,
+    updates: Partial<ScheduledSwap>
+  ): Promise<ScheduledSwap | undefined> {
+    const scheduledSwap = this.scheduledSwaps.get(id);
+    if (!scheduledSwap) return undefined;
+
+    const updatedScheduledSwap = {
+      ...scheduledSwap,
+      ...updates,
+      updatedAt: new Date(),
+    };
+    this.scheduledSwaps.set(id, updatedScheduledSwap);
+    return updatedScheduledSwap;
+  }
+
+  async deleteScheduledSwap(id: number): Promise<boolean> {
+    return this.scheduledSwaps.delete(id);
+  }
+
+  // Swap execution operations
+  async getSwapExecution(id: number): Promise<SwapExecution | undefined> {
+    return this.swapExecutions.get(id);
+  }
+
+  async getSwapExecutionsByScheduledSwapId(scheduledSwapId: number): Promise<SwapExecution[]> {
+    return Array.from(this.swapExecutions.values()).filter(
+      (execution) => execution.scheduledSwapId === scheduledSwapId
+    );
+  }
+
+  async createSwapExecution(insertSwapExecution: InsertSwapExecution): Promise<SwapExecution> {
+    const id = this.currentSwapExecutionId++;
+    const swapExecution: SwapExecution = {
+      id,
+      scheduledSwapId: insertSwapExecution.scheduledSwapId,
+      swapId: insertSwapExecution.swapId || null,
+      executionTime: insertSwapExecution.executionTime,
+      status: insertSwapExecution.status,
+      failureReason: insertSwapExecution.failureReason || null,
+      createdAt: new Date(),
+    };
+    this.swapExecutions.set(id, swapExecution);
+    return swapExecution;
+  }
+
+  async updateSwapExecution(
+    id: number,
+    updates: Partial<SwapExecution>
+  ): Promise<SwapExecution | undefined> {
+    const swapExecution = this.swapExecutions.get(id);
+    if (!swapExecution) return undefined;
+
+    const updatedSwapExecution = {
+      ...swapExecution,
+      ...updates,
+    };
+    this.swapExecutions.set(id, updatedSwapExecution);
+    return updatedSwapExecution;
+  }
+
+  async deleteSwapExecution(id: number): Promise<boolean> {
+    return this.swapExecutions.delete(id);
   }
 }
 
@@ -719,7 +855,7 @@ export class DatabaseStorage implements IStorage {
       .values({
         ...insertSwap,
         status: insertSwap.status || 'pending',
-        fee: insertSwap.fee || 0,
+        fee: insertSwap.fee || '0',
       })
       .returning();
     return swap;
@@ -742,6 +878,101 @@ export class DatabaseStorage implements IStorage {
 
   async deleteSwap(id: number): Promise<boolean> {
     const result = await db.delete(swaps).where(eq(swaps.id, id));
+    return (result.rowCount || 0) > 0;
+  }
+
+  // Scheduled swap operations
+  async getScheduledSwap(id: number): Promise<ScheduledSwap | undefined> {
+    const [scheduledSwap] = await db
+      .select()
+      .from(scheduledSwaps)
+      .where(eq(scheduledSwaps.id, id));
+    return scheduledSwap || undefined;
+  }
+
+  async getScheduledSwapsByUserId(userId: number): Promise<ScheduledSwap[]> {
+    return db
+      .select()
+      .from(scheduledSwaps)
+      .where(eq(scheduledSwaps.userId, userId));
+  }
+
+  async getActiveScheduledSwaps(): Promise<ScheduledSwap[]> {
+    return db
+      .select()
+      .from(scheduledSwaps)
+      .where(eq(scheduledSwaps.status, 'active'));
+  }
+
+  async createScheduledSwap(insertScheduledSwap: InsertScheduledSwap): Promise<ScheduledSwap> {
+    const [scheduledSwap] = await db
+      .insert(scheduledSwaps)
+      .values({
+        ...insertScheduledSwap,
+        status: insertScheduledSwap.status || 'active',
+      })
+      .returning();
+    return scheduledSwap;
+  }
+
+  async updateScheduledSwap(
+    id: number,
+    updates: Partial<ScheduledSwap>
+  ): Promise<ScheduledSwap | undefined> {
+    const [scheduledSwap] = await db
+      .update(scheduledSwaps)
+      .set({
+        ...updates,
+        updatedAt: new Date(),
+      })
+      .where(eq(scheduledSwaps.id, id))
+      .returning();
+    return scheduledSwap || undefined;
+  }
+
+  async deleteScheduledSwap(id: number): Promise<boolean> {
+    const result = await db.delete(scheduledSwaps).where(eq(scheduledSwaps.id, id));
+    return (result.rowCount || 0) > 0;
+  }
+
+  // Swap execution operations
+  async getSwapExecution(id: number): Promise<SwapExecution | undefined> {
+    const [swapExecution] = await db
+      .select()
+      .from(swapExecutions)
+      .where(eq(swapExecutions.id, id));
+    return swapExecution || undefined;
+  }
+
+  async getSwapExecutionsByScheduledSwapId(scheduledSwapId: number): Promise<SwapExecution[]> {
+    return db
+      .select()
+      .from(swapExecutions)
+      .where(eq(swapExecutions.scheduledSwapId, scheduledSwapId));
+  }
+
+  async createSwapExecution(insertSwapExecution: InsertSwapExecution): Promise<SwapExecution> {
+    const [swapExecution] = await db
+      .insert(swapExecutions)
+      .values(insertSwapExecution)
+      .returning();
+    return swapExecution;
+  }
+
+  async updateSwapExecution(
+    id: number,
+    updates: Partial<SwapExecution>
+  ): Promise<SwapExecution | undefined> {
+    const [swapExecution] = await db
+      .update(swapExecutions)
+      .set(updates)
+      .where(eq(swapExecutions.id, id))
+      .returning();
+    return swapExecution || undefined;
+  }
+
+  async deleteSwapExecution(id: number): Promise<boolean> {
+    const result = await db.delete(swapExecutions).where(eq(swapExecutions.id, id));
     return (result.rowCount || 0) > 0;
   }
 }

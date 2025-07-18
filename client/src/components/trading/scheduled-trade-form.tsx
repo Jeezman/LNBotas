@@ -406,6 +406,8 @@ export function ScheduledTradeForm() {
                     <SelectContent>
                       <SelectItem value="1">1x</SelectItem>
                       <SelectItem value="2">2x</SelectItem>
+                      <SelectItem value="3">3x</SelectItem>
+                      <SelectItem value="4">4x</SelectItem>
                       <SelectItem value="5">5x</SelectItem>
                       <SelectItem value="10">10x</SelectItem>
                       <SelectItem value="25">25x</SelectItem>
