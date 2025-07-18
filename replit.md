@@ -44,6 +44,12 @@ Preferred communication style: Simple, everyday language.
   - Implemented green badge styling for completed deposits using custom Tailwind classes
   - Fixed database constraint issues for deposit synchronization with LN Markets payment hashes
   - Added automatic database updates when checking individual deposit status from LN Markets
+- **Deployment Fix**: Resolved Rollup module error for production deployment (July 2025)
+  - Fixed "Cannot find module @rollup/rollup-linux-x64-gnu" error by installing missing native dependency
+  - Cleaned package cache and reinstalled dependencies to ensure proper module resolution
+  - Verified successful production build with 638KB JavaScript bundle and 69KB CSS
+  - Confirmed deployment readiness with properly generated static assets in dist/public folder
+  - Build process now completes successfully with all Rollup dependencies resolved
 
 ## System Architecture
 
