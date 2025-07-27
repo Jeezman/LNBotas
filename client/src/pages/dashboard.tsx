@@ -17,6 +17,7 @@ import { useLocation } from 'wouter';
 import UserPage from './user';
 import FuturesPage from './futures';
 import PortfolioPage from './portfolio';
+import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 
 function DashboardContent() {
   return (
@@ -112,14 +113,16 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="min-h-screen flex bg-gray-50">
-      <Sidebar />
+    <SidebarProvider>
+      <div className="min-h-screen flex bg-gray-50">
+        <Sidebar />
 
-      <main className="flex-1 flex flex-col overflow-hidden">
+        <main className="flex-1 flex flex-col overflow-hidden">
         {/* Top Bar */}
         <header className="bg-white border-b border-gray-200 px-4 lg:px-6 py-3 lg:py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2 lg:space-x-4">
+              <SidebarTrigger className="md:inline-flex" />
               <MobileNav />
               <h2 className="text-lg lg:text-2xl font-bold text-gray-900">
                 {getPageTitle()}
@@ -203,5 +206,6 @@ export default function Dashboard() {
         <div className="flex-1 overflow-y-auto p-4 lg:p-6">{renderPageContent()}</div>
       </main>
     </div>
+    </SidebarProvider>
   );
 }
