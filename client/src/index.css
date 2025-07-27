@@ -26,16 +26,6 @@
   --success: hsl(142, 76%, 36%);
   --warning: hsl(38, 92%, 50%);
   --danger: hsl(0, 84.2%, 60.2%);
-  
-  /* Sidebar */
-  --sidebar-background: 0 0% 98%;
-  --sidebar-foreground: 240 5.3% 26.1%;
-  --sidebar-primary: 240 5.9% 10%;
-  --sidebar-primary-foreground: 0 0% 98%;
-  --sidebar-accent: 240 4.8% 95.9%;
-  --sidebar-accent-foreground: 240 5.9% 10%;
-  --sidebar-border: 220 13% 91%;
-  --sidebar-ring: 217.2 32.6% 17.5%;
 }
 
 .dark {
@@ -62,16 +52,6 @@
   --success: hsl(142, 76%, 36%);
   --warning: hsl(38, 92%, 50%);
   --danger: hsl(0, 62.8%, 30.6%);
-  
-  /* Sidebar */
-  --sidebar-background: 240 5.9% 10%;
-  --sidebar-foreground: 240 4.8% 95.9%;
-  --sidebar-primary: 224.3 76.3% 94.1%;
-  --sidebar-primary-foreground: 226 71% 40.8%;
-  --sidebar-accent: 240 3.7% 15.9%;
-  --sidebar-accent-foreground: 240 4.8% 95.9%;
-  --sidebar-border: 240 3.7% 15.9%;
-  --sidebar-ring: 217.2 32.6% 17.5%;
 }
 
 @layer base {
