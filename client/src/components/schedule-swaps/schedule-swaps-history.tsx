@@ -28,6 +28,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useAuth } from '@/hooks/use-auth';
+import { usePagination } from '@/hooks/usePagination';
+import { TablePaginationControls } from '@/components/ui/table-pagination-controls';
+import { TableRowSkeleton, ScheduleSwapsHistorySkeletonConfig } from '@/components/ui/table-row-skeleton';
 
 interface SwapExecution {
   id: number;
@@ -55,6 +58,7 @@ export function ScheduleSwapsHistory() {
   const [executions, setExecutions] = useState<SwapExecution[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [paginationLoading, setPaginationLoading] = useState(false);
 
   useEffect(() => {
     if (user?.id) {
@@ -91,6 +95,45 @@ export function ScheduleSwapsHistory() {
   const filteredExecutions = executions.filter(execution => 
     statusFilter === 'all' || execution.status === statusFilter
   );
+
+  // Sort executions by execution time (newest first) and apply pagination
+  const sortedExecutions = filteredExecutions.sort(
+    (a, b) => new Date(b.executionTime).getTime() - new Date(a.executionTime).getTime()
+  );
+
+  // Pagination hook with URL synchronization
+  const pagination = usePagination({
+    data: sortedExecutions,
+    defaultItemsPerPage: 15,
+    storageKey: 'schedule-swaps-history-items-per-page',
+    enableUrlSync: true,
+    urlPrefix: 'schedules'
+  });
+
+  // Handle pagination with loading states
+  const handlePageChange = (page: number) => {
+    setPaginationLoading(true);
+    setTimeout(() => {
+      pagination.setPage(page);
+      setPaginationLoading(false);
+    }, 300);
+  };
+
+  const handleItemsPerPageChange = (count: number | 'all') => {
+    setPaginationLoading(true);
+    setTimeout(() => {
+      pagination.setItemsPerPage(count);
+      setPaginationLoading(false);
+    }, 300);
+  };
+
+  const handleNavigation = (action: () => void) => {
+    setPaginationLoading(true);
+    setTimeout(() => {
+      action();
+      setPaginationLoading(false);
+    }, 300);
+  };
 
   const getScheduleDetails = (scheduledSwapId: number) => {
     return schedules.find(s => s.id === scheduledSwapId);
@@ -162,7 +205,7 @@ export function ScheduleSwapsHistory() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Total Executions</p>
-                <p className="text-2xl font-bold">{executions.length}</p>
+                <p className="text-2xl font-bold">{filteredExecutions.length}</p>
               </div>
               <Clock className="w-8 h-8 text-gray-400" />
             </div>
@@ -174,7 +217,7 @@ export function ScheduleSwapsHistory() {
               <div>
                 <p className="text-sm text-gray-600">Successful</p>
                 <p className="text-2xl font-bold text-green-600">
-                  {executions.filter(e => e.status === 'success').length}
+                  {filteredExecutions.filter(e => e.status === 'success').length}
                 </p>
               </div>
               <CheckCircle className="w-8 h-8 text-green-400" />
@@ -187,7 +230,7 @@ export function ScheduleSwapsHistory() {
               <div>
                 <p className="text-sm text-gray-600">Failed</p>
                 <p className="text-2xl font-bold text-red-600">
-                  {executions.filter(e => e.status === 'failed').length}
+                  {filteredExecutions.filter(e => e.status === 'failed').length}
                 </p>
               </div>
               <XCircle className="w-8 h-8 text-red-400" />
@@ -200,8 +243,8 @@ export function ScheduleSwapsHistory() {
               <div>
                 <p className="text-sm text-gray-600">Success Rate</p>
                 <p className="text-2xl font-bold">
-                  {executions.length > 0 
-                    ? Math.round((executions.filter(e => e.status === 'success').length / executions.length) * 100)
+                  {filteredExecutions.length > 0 
+                    ? Math.round((filteredExecutions.filter(e => e.status === 'success').length / filteredExecutions.length) * 100)
                     : 0}%
                 </p>
               </div>
@@ -236,6 +279,27 @@ export function ScheduleSwapsHistory() {
           </div>
         </CardHeader>
         <CardContent>
+          {/* Top pagination controls */}
+          {filteredExecutions.length > 0 && (
+            <TablePaginationControls
+              currentPage={pagination.currentPage}
+              totalPages={pagination.totalPages}
+              itemsPerPage={pagination.itemsPerPage}
+              totalItems={pagination.totalItems}
+              startIndex={pagination.startIndex}
+              endIndex={pagination.endIndex}
+              isFirstPage={pagination.isFirstPage}
+              isLastPage={pagination.isLastPage}
+              onPageChange={handlePageChange}
+              onItemsPerPageChange={handleItemsPerPageChange}
+              onFirstPage={() => handleNavigation(pagination.goToFirstPage)}
+              onLastPage={() => handleNavigation(pagination.goToLastPage)}
+              onNextPage={() => handleNavigation(pagination.goToNextPage)}
+              onPreviousPage={() => handleNavigation(pagination.goToPreviousPage)}
+              isLoading={paginationLoading}
+              itemLabel="executions"
+            />
+          )}
           {filteredExecutions.length === 0 ? (
             <div className="text-center py-8">
               <Clock className="w-12 h-12 text-gray-400 mx-auto mb-2" />
@@ -260,67 +324,96 @@ export function ScheduleSwapsHistory() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredExecutions.map((execution) => {
-                  const schedule = getScheduleDetails(execution.scheduledSwapId);
-                  return (
-                    <TableRow key={execution.id}>
-                      <TableCell>
-                        <div className="text-sm">
-                          {new Date(execution.executionTime).toLocaleDateString()}
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          {new Date(execution.executionTime).toLocaleTimeString()}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="font-medium">
-                          {schedule?.name || `Schedule #${execution.scheduledSwapId}`}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline">
-                          {schedule ? getScheduleTypeLabel(schedule.scheduleType) : 'Unknown'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center space-x-1">
-                          <ArrowUpDown className="w-3 h-3 text-gray-500" />
-                          <span className="text-sm">
-                            {schedule ? getSwapDirectionLabel(schedule.swapDirection) : 'Unknown'}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="text-sm font-medium">
-                          {schedule ? parseFloat(schedule.amount).toFixed(8) : 'Unknown'} 
-                          {schedule && schedule.swapDirection === 'btc_to_usd' ? ' BTC' : ' USD'}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center space-x-2">
-                          {getStatusIcon(execution.status)}
-                          <Badge className={getStatusColor(execution.status)}>
-                            {execution.status}
-                          </Badge>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {execution.failureReason && (
-                          <div className="text-xs text-red-600 max-w-xs truncate">
-                            {execution.failureReason}
+                {paginationLoading ? (
+                  <TableRowSkeleton 
+                    columns={ScheduleSwapsHistorySkeletonConfig} 
+                    rows={pagination.itemsPerPage === 'all' ? Math.min(filteredExecutions.length, 15) : pagination.itemsPerPage}
+                  />
+                ) : (
+                  pagination.paginatedData.map((execution) => {
+                    const schedule = getScheduleDetails(execution.scheduledSwapId);
+                    return (
+                      <TableRow key={execution.id}>
+                        <TableCell>
+                          <div className="text-sm">
+                            {new Date(execution.executionTime).toLocaleDateString()}
                           </div>
-                        )}
-                        {execution.swapId && (
                           <div className="text-xs text-gray-500">
-                            Swap ID: {execution.swapId}
+                            {new Date(execution.executionTime).toLocaleTimeString()}
                           </div>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
+                        </TableCell>
+                        <TableCell>
+                          <div className="font-medium">
+                            {schedule?.name || `Schedule #${execution.scheduledSwapId}`}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">
+                            {schedule ? getScheduleTypeLabel(schedule.scheduleType) : 'Unknown'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center space-x-1">
+                            <ArrowUpDown className="w-3 h-3 text-gray-500" />
+                            <span className="text-sm">
+                              {schedule ? getSwapDirectionLabel(schedule.swapDirection) : 'Unknown'}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="text-sm font-medium">
+                            {schedule ? parseFloat(schedule.amount).toFixed(8) : 'Unknown'} 
+                            {schedule && schedule.swapDirection === 'btc_to_usd' ? ' BTC' : ' USD'}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center space-x-2">
+                            {getStatusIcon(execution.status)}
+                            <Badge className={getStatusColor(execution.status)}>
+                              {execution.status}
+                            </Badge>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {execution.failureReason && (
+                            <div className="text-xs text-red-600 max-w-xs truncate">
+                              {execution.failureReason}
+                            </div>
+                          )}
+                          {execution.swapId && (
+                            <div className="text-xs text-gray-500">
+                              Swap ID: {execution.swapId}
+                            </div>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
               </TableBody>
             </Table>
+          )}
+
+          {/* Bottom pagination controls */}
+          {filteredExecutions.length > 0 && (
+            <TablePaginationControls
+              currentPage={pagination.currentPage}
+              totalPages={pagination.totalPages}
+              itemsPerPage={pagination.itemsPerPage}
+              totalItems={pagination.totalItems}
+              startIndex={pagination.startIndex}
+              endIndex={pagination.endIndex}
+              isFirstPage={pagination.isFirstPage}
+              isLastPage={pagination.isLastPage}
+              onPageChange={handlePageChange}
+              onItemsPerPageChange={handleItemsPerPageChange}
+              onFirstPage={() => handleNavigation(pagination.goToFirstPage)}
+              onLastPage={() => handleNavigation(pagination.goToLastPage)}
+              onNextPage={() => handleNavigation(pagination.goToNextPage)}
+              onPreviousPage={() => handleNavigation(pagination.goToPreviousPage)}
+              isLoading={paginationLoading}
+              itemLabel="executions"
+            />
           )}
         </CardContent>
       </Card>

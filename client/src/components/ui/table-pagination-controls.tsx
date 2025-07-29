@@ -76,7 +76,7 @@ export function TablePaginationControls({
     setJumpToPage('');
   };
 
-  const handleJumpInputKeyPress = (e: React.KeyboardEvent) => {
+  const handleJumpInputKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       handleJumpToPage();
     }
@@ -163,6 +163,7 @@ export function TablePaginationControls({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="10">10</SelectItem>
+              <SelectItem value="15">15</SelectItem>
               <SelectItem value="20">20</SelectItem>
               <SelectItem value="50">50</SelectItem>
               <SelectItem value="all">All</SelectItem>
@@ -192,7 +193,7 @@ export function TablePaginationControls({
               placeholder="Page"
               value={jumpToPage}
               onChange={(e) => setJumpToPage(e.target.value)}
-              onKeyPress={handleJumpInputKeyPress}
+              onKeyDown={handleJumpInputKeyDown}
               className="w-20"
               min={1}
               max={totalPages}

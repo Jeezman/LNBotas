@@ -62,3 +62,13 @@ export const TradingPositionsSkeletonConfig: ColumnConfig[] = [
   { width: 'w-24' }, // Created
   { width: 'w-16' }, // Actions
 ];
+
+export const ScheduleSwapsHistorySkeletonConfig: ColumnConfig[] = [
+  { width: 'w-24' }, // Date & Time
+  { width: 'w-32' }, // Schedule
+  { width: 'w-20' }, // Type
+  { width: 'w-24' }, // Direction
+  { width: 'w-20' }, // Amount
+  { width: 'w-16' }, // Status
+  { width: 'w-32' }, // Details
+];

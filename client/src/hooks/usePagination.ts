@@ -29,7 +29,6 @@ interface UsePaginationReturn<T> {
 // URL parameter utilities
 const getUrlParams = (prefix?: string) => {
   if (typeof window === 'undefined') return {};
-  console.log('prefix', prefix);
   const params = new URLSearchParams(window.location.search);
   const pageParam = prefix ? `${prefix}_page` : 'page';
   const sizeParam = prefix ? `${prefix}_size` : 'size';
@@ -110,31 +109,28 @@ export function usePagination<T>({
     }
   }, [itemsPerPage, currentPage, storageKey, enableUrlSync, urlPrefix]);
 
-  // // Listen for browser navigation (back/forward buttons)
-  // useEffect(() => {
-  //   console.log('enableUrlSync', enableUrlSync);
-  //   if (!enableUrlSync || typeof window === 'undefined') return;
+  // Listen for browser navigation (back/forward buttons)
+  useEffect(() => {
+    if (!enableUrlSync || typeof window === 'undefined') return;
 
-  //   const handlePopState = () => {
-  //     const urlParams = getUrlParams(urlPrefix);
-  //     const urlPage = urlParams.page ? parseInt(urlParams.page, 10) : 1;
-  //     const urlSize = urlParams.size;
+    const handlePopState = () => {
+      const urlParams = getUrlParams(urlPrefix);
+      const urlPage = urlParams.page ? parseInt(urlParams.page, 10) : 1;
+      const urlSize = urlParams.size;
 
-  //     console.log('urlPage', urlPage);
+      if (urlPage !== currentPage) {
+        setCurrentPage(urlPage);
+      }
 
-  //     if (urlPage !== currentPage) {
-  //       setCurrentPage(urlPage);
-  //     }
+      if (urlSize && urlSize !== itemsPerPage.toString()) {
+        const newSize = urlSize === 'all' ? 'all' : parseInt(urlSize, 10);
+        setItemsPerPageState(newSize);
+      }
+    };
 
-  //     if (urlSize && urlSize !== itemsPerPage.toString()) {
-  //       const newSize = urlSize === 'all' ? 'all' : parseInt(urlSize, 10);
-  //       setItemsPerPageState(newSize);
-  //     }
-  //   };
-
-  //   window.addEventListener('popstate', handlePopState);
-  //   return () => window.removeEventListener('popstate', handlePopState);
-  // }, [enableUrlSync, urlPrefix, currentPage, itemsPerPage]);
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [enableUrlSync, urlPrefix, currentPage, itemsPerPage]);
 
   // Reset to first page when data changes significantly
   useEffect(() => {
