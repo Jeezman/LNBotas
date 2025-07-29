@@ -22,6 +22,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { formatDistanceToNow } from 'date-fns';
 import { usePagination } from '@/hooks/usePagination';
 import { TablePaginationControls } from '@/components/ui/table-pagination-controls';
+import { formatAmount } from '@/lib/utils';
 import {
   TableRowSkeleton,
   SwapHistorySkeletonConfig,
@@ -96,17 +97,17 @@ export function SwapHistoryTable({
   const formatAssetAmount = (asset: string, amount: number) => {
     if (asset === 'BTC') {
       // Show satoshis directly
-      return `${amount.toLocaleString()} sats`;
+      return `${formatAmount(amount, 0)} sats`;
     } else {
       // Convert cents to USD
-      return `$${amount}`;
+      return `$${formatAmount(amount)}`;
     }
   };
 
   const formatExchangeRate = (rate: string | null) => {
     if (!rate) return '—';
     const numRate = parseFloat(rate);
-    return `$${numRate.toLocaleString()}`;
+    return `$${formatAmount(numRate)}`;
   };
 
   if (isLoading) {
@@ -200,9 +201,6 @@ export function SwapHistoryTable({
                     <TableHead className="text-xs lg:text-sm hidden sm:table-cell">
                       Exchange Rate
                     </TableHead>
-                    <TableHead className="text-xs lg:text-sm hidden md:table-cell">
-                      Fee
-                    </TableHead>
                     <TableHead className="text-xs lg:text-sm">Date</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -258,9 +256,6 @@ export function SwapHistoryTable({
                         </TableCell>
                         <TableCell className="font-mono text-xs lg:text-sm hidden sm:table-cell">
                           {formatExchangeRate(swap.exchangeRate)}
-                        </TableCell>
-                        <TableCell className="font-mono text-xs lg:text-sm hidden md:table-cell">
-                          {swap.fee ? `${swap.fee.toLocaleString()} sats` : '—'}
                         </TableCell>
                         <TableCell className="text-xs lg:text-sm">
                           <div className="text-xs lg:text-sm">

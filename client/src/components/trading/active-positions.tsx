@@ -37,8 +37,10 @@ export function ActivePositions() {
   const [selectedTrade, setSelectedTrade] = useState<Trade | null>(null);
   const [isCloseTradeModalOpen, setIsCloseTradeModalOpen] = useState(false);
   const [isCloseAllModalOpen, setIsCloseAllModalOpen] = useState(false);
-  const [closeAllModalType, setCloseAllModalType] = useState<'close-all' | 'cancel-orders'>('close-all');
-  
+  const [closeAllModalType, setCloseAllModalType] = useState<
+    'close-all' | 'cancel-orders'
+  >('close-all');
+
   const { data: trades = [], isLoading } = useActiveTrades();
   const closeTrade = useCloseTrade();
   const closeAllTrades = useCloseAllTrades();
@@ -220,14 +222,17 @@ export function ActivePositions() {
               <TableHeader>
                 <TableRow>
                   <TableHead className="text-xs lg:text-sm">Side</TableHead>
-                  <TableHead className="text-xs lg:text-sm">Type</TableHead>
                   <TableHead className="text-xs lg:text-sm">Margin</TableHead>
                   <TableHead className="text-xs lg:text-sm">Leverage</TableHead>
-                  <TableHead className="text-xs lg:text-sm">Entry Price</TableHead>
+                  <TableHead className="text-xs lg:text-sm">
+                    Entry Price
+                  </TableHead>
                   <TableHead className="text-xs lg:text-sm">P/L</TableHead>
                   <TableHead className="text-xs lg:text-sm">Status</TableHead>
                   <TableHead className="text-xs lg:text-sm">Created</TableHead>
-                  <TableHead className="text-xs lg:text-sm text-right">Actions</TableHead>
+                  <TableHead className="text-xs lg:text-sm text-right">
+                    Actions
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -241,19 +246,26 @@ export function ActivePositions() {
                         {trade.side === 'buy' ? 'Long' : 'Short'}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-xs lg:text-sm">
-                      <Badge variant="outline" className="text-xs">
-                        {trade.type}
-                      </Badge>
-                    </TableCell>
                     <TableCell className="text-xs lg:text-sm font-mono">
-                      {trade.margin} sats
+                      {parseFloat(
+                        trade.margin?.toString() ?? '0'
+                      ).toLocaleString('en-US', {
+                        minimumFractionDigits: 0,
+                        maximumFractionDigits: 0,
+                      })}{' '}
+                      sats
                     </TableCell>
                     <TableCell className="text-xs lg:text-sm">
                       {trade.leverage}x
                     </TableCell>
                     <TableCell className="text-xs lg:text-sm">
-                      {trade.entryPrice}
+                      {parseFloat(trade.entryPrice ?? '0').toLocaleString(
+                        'en-US',
+                        {
+                          minimumFractionDigits: 0,
+                          maximumFractionDigits: 2,
+                        }
+                      )}
                     </TableCell>
                     <TableCell>
                       {trade.pnl ? (
@@ -266,7 +278,7 @@ export function ActivePositions() {
                         >
                           {parseFloat(trade.pnl) >= 0 ? '+' : ''}
                           {parseFloat(trade.pnl).toLocaleString('en-US', {
-                            minimumFractionDigits: 2,
+                            minimumFractionDigits: 0,
                             maximumFractionDigits: 2,
                           })}
                         </span>
@@ -341,14 +353,14 @@ export function ActivePositions() {
           isLoading={closeTrade.isPending}
         />
 
-                 <CloseAllTradesModal
-           trades={filteredTrades}
-           isOpen={isCloseAllModalOpen}
-           onClose={() => setIsCloseAllModalOpen(false)}
-           onConfirm={handleCloseAllConfirm}
-           type={closeAllModalType}
-           isLoading={closeAllTrades.isPending || cancelAllOrders.isPending}
-         />
+        <CloseAllTradesModal
+          trades={filteredTrades}
+          isOpen={isCloseAllModalOpen}
+          onClose={() => setIsCloseAllModalOpen(false)}
+          onConfirm={handleCloseAllConfirm}
+          type={closeAllModalType}
+          isLoading={closeAllTrades.isPending || cancelAllOrders.isPending}
+        />
       </CardContent>
     </Card>
   );
