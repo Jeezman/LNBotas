@@ -49,8 +49,8 @@ export function Sidebar() {
   return (
     <SidebarPrimitive collapsible="icon" className="border-r border-gray-200">
       <SidebarHeader className="border-b border-gray-200">
-        <div className="flex items-center space-x-3 px-4 py-4">
-          <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+        <div className="flex items-center justify-center group-data-[state=expanded]:justify-start space-x-3 px-4 py-4">
+          <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center flex-shrink-0">
             <Zap className="text-white h-5 w-5" />
           </div>
           <div className="group-data-[collapsible=icon]:hidden">
@@ -100,7 +100,7 @@ export function Sidebar() {
               tooltip="User Profile"
               className="hover:bg-gray-50"
             >
-              <Link href="/user" className="flex items-center space-x-">
+              <Link href="/user" className="flex items-center space-x-3">
                 <div className="w-6 h-6 bg-gray-300 rounded-full flex items-center justify-center">
                   <User className="text-gray-600 h-3 w-3" />
                 </div>
