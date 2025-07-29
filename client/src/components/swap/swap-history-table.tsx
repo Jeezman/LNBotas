@@ -45,7 +45,6 @@ export function SwapHistoryTable({
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   );
 
-  // Pagination hook with URL synchronization
   const pagination = usePagination({
     data: sortedSwaps,
     defaultItemsPerPage: 20,

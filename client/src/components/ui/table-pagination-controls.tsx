@@ -55,14 +55,14 @@ export function TablePaginationControls({
   onNextPage,
   onPreviousPage,
   isLoading = false,
-  itemLabel = 'items'
+  itemLabel = 'items',
 }: TablePaginationControlsProps) {
   const [jumpToPage, setJumpToPage] = useState('');
   const { toast } = useToast();
 
   const handleJumpToPage = () => {
     const pageNumber = parseInt(jumpToPage, 10);
-    
+
     if (isNaN(pageNumber) || pageNumber < 1 || pageNumber > totalPages) {
       toast({
         title: 'Invalid Page Number',
@@ -71,7 +71,7 @@ export function TablePaginationControls({
       });
       return;
     }
-    
+
     onPageChange(pageNumber);
     setJumpToPage('');
   };
@@ -90,11 +90,10 @@ export function TablePaginationControls({
     }
   };
 
-  // Generate page numbers to display
   const getPageNumbers = () => {
     const pages: (number | 'ellipsis')[] = [];
     const maxVisiblePages = 5;
-    
+
     if (totalPages <= maxVisiblePages) {
       // Show all pages if there are few enough
       for (let i = 1; i <= totalPages; i++) {
@@ -103,39 +102,39 @@ export function TablePaginationControls({
     } else {
       // Always show first page
       pages.push(1);
-      
+
       // Determine range around current page
       let startPage = Math.max(2, currentPage - 1);
       let endPage = Math.min(totalPages - 1, currentPage + 1);
-      
+
       // Adjust range if we're near the beginning or end
       if (currentPage <= 3) {
         endPage = 4;
       } else if (currentPage >= totalPages - 2) {
         startPage = totalPages - 3;
       }
-      
+
       // Add ellipsis before start if needed
       if (startPage > 2) {
         pages.push('ellipsis');
       }
-      
+
       // Add middle pages
       for (let i = startPage; i <= endPage; i++) {
         pages.push(i);
       }
-      
+
       // Add ellipsis after end if needed
       if (endPage < totalPages - 1) {
         pages.push('ellipsis');
       }
-      
+
       // Always show last page
       if (totalPages > 1) {
         pages.push(totalPages);
       }
     }
-    
+
     return pages;
   };
 
@@ -151,7 +150,9 @@ export function TablePaginationControls({
       <div className="flex flex-col sm:flex-row sm:items-center gap-4">
         {/* Items per page selector */}
         <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground whitespace-nowrap">Show</span>
+          <span className="text-sm text-muted-foreground whitespace-nowrap">
+            Show
+          </span>
           <Select
             value={itemsPerPage.toString()}
             onValueChange={handleItemsPerPageChange}
@@ -183,7 +184,9 @@ export function TablePaginationControls({
         <div className="flex flex-col lg:flex-row lg:items-center gap-4">
           {/* Jump to page (desktop only) */}
           <div className="hidden lg:flex items-center gap-2">
-            <span className="text-sm text-muted-foreground whitespace-nowrap">Go to</span>
+            <span className="text-sm text-muted-foreground whitespace-nowrap">
+              Go to
+            </span>
             <Input
               type="number"
               placeholder="Page"
@@ -226,7 +229,11 @@ export function TablePaginationControls({
               <PaginationItem>
                 <PaginationPrevious
                   onClick={onPreviousPage}
-                  className={isFirstPage || isLoading ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                  className={
+                    isFirstPage || isLoading
+                      ? 'pointer-events-none opacity-50'
+                      : 'cursor-pointer'
+                  }
                 />
               </PaginationItem>
 
@@ -240,7 +247,11 @@ export function TablePaginationControls({
                       <PaginationLink
                         onClick={() => onPageChange(page)}
                         isActive={page === currentPage}
-                        className={isLoading ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                        className={
+                          isLoading
+                            ? 'pointer-events-none opacity-50'
+                            : 'cursor-pointer'
+                        }
                       >
                         {page}
                       </PaginationLink>
@@ -260,7 +271,11 @@ export function TablePaginationControls({
               <PaginationItem>
                 <PaginationNext
                   onClick={onNextPage}
-                  className={isLastPage || isLoading ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                  className={
+                    isLastPage || isLoading
+                      ? 'pointer-events-none opacity-50'
+                      : 'cursor-pointer'
+                  }
                 />
               </PaginationItem>
 

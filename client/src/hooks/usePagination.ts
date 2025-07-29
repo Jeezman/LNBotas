@@ -1,5 +1,4 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
-import { useLocation } from 'wouter';
 
 interface UsePaginationProps<T> {
   data: T[];

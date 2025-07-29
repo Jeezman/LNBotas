@@ -16,7 +16,7 @@ function SkeletonTableRow({ columns }: { columns: ColumnConfig[] }) {
   return (
     <TableRow>
       {columns.map((column, index) => (
-        <TableCell 
+        <TableCell
           key={index}
           className={`${column.hideOnMobile ? 'hidden sm:table-cell' : ''} ${
             column.hideOnTablet ? 'hidden md:table-cell' : ''
@@ -29,24 +29,23 @@ function SkeletonTableRow({ columns }: { columns: ColumnConfig[] }) {
   );
 }
 
-export function TableRowSkeleton({ columns, rows = 20 }: TableRowSkeletonProps) {
+export function TableRowSkeleton({
+  columns,
+  rows = 20,
+}: TableRowSkeletonProps) {
   return (
     <>
       {Array.from({ length: rows }).map((_, index) => (
-        <SkeletonTableRow 
-          key={index} 
-          columns={columns}
-        />
+        <SkeletonTableRow key={index} columns={columns} />
       ))}
     </>
   );
 }
 
-// Predefined skeleton configurations for common table types
 export const SwapHistorySkeletonConfig: ColumnConfig[] = [
   { width: 'w-16' }, // Status badge
   { width: 'w-24' }, // From asset
-  { width: 'w-24' }, // To asset  
+  { width: 'w-24' }, // To asset
   { width: 'w-20', hideOnMobile: true }, // Exchange rate
   { width: 'w-16', hideOnTablet: true }, // Fee
   { width: 'w-28' }, // Date
