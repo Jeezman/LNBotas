@@ -15,10 +15,15 @@ import {
   Percent,
 } from 'lucide-react';
 import { format } from 'date-fns';
+import { useState } from 'react';
+import { EditScheduledTradeModal } from './edit-scheduled-trade-modal';
+import type { ScheduledTrade } from '@/lib/api';
 
 export function ScheduledTrades() {
   const { data: scheduledTrades = [], isLoading } = useScheduledTrades();
   const deleteScheduledTrade = useDeleteScheduledTrade();
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [selectedTrade, setSelectedTrade] = useState<ScheduledTrade | null>(null);
 
   // Sort scheduled trades to show pending tasks first
   const sortedScheduledTrades = [...scheduledTrades].sort((a, b) => {
@@ -45,6 +50,16 @@ export function ScheduledTrades() {
     if (confirm('Are you sure you want to delete this scheduled trade?')) {
       deleteScheduledTrade.mutate(scheduledTradeId);
     }
+  };
+
+  const handleEditScheduledTrade = (scheduledTrade: ScheduledTrade) => {
+    setSelectedTrade(scheduledTrade);
+    setEditModalOpen(true);
+  };
+
+  const handleCloseEditModal = () => {
+    setEditModalOpen(false);
+    setSelectedTrade(null);
   };
 
   const getTriggerIcon = (triggerType: string) => {
@@ -248,13 +263,7 @@ export function ScheduledTrades() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => {
-                            // TODO: Implement edit functionality
-                            console.log(
-                              'Edit scheduled trade:',
-                              scheduledTrade.id
-                            );
-                          }}
+                          onClick={() => handleEditScheduledTrade(scheduledTrade)}
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
@@ -277,6 +286,12 @@ export function ScheduledTrades() {
           </div>
         )}
       </CardContent>
+      
+      <EditScheduledTradeModal
+        scheduledTrade={selectedTrade}
+        isOpen={editModalOpen}
+        onClose={handleCloseEditModal}
+      />
     </Card>
   );
 }
