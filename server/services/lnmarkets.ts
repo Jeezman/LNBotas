@@ -129,48 +129,51 @@ export class LNMarketsService {
 
   constructor(config: LNMarketsConfig) {
     this.config = config;
-    this.baseUrl = config.network === 'testnet' 
-      ? 'https://api.testnet4.lnmarkets.com/v2'
-      : 'https://api.lnmarkets.com/v2';
+    this.baseUrl =
+      config.network === 'testnet'
+        ? 'https://api.testnet4.lnmarkets.com/v2'
+        : 'https://api.lnmarkets.com/v2';
   }
 
-  private generateSignature(timestamp: string, method: string, path: string, params: string = ''): string {
+  private generateSignature(
+    timestamp: string,
+    method: string,
+    path: string,
+    params: string = ''
+  ): string {
     // LN Markets signature format: timestamp + method + path + params
     // path MUST include /v2 prefix (e.g., /v2/user not /user)
     // params: URLSearchParams for GET/DELETE, JSON for POST/PUT, empty string if no data
     const fullPath = `/v2${path}`;
     const message = timestamp + method.toUpperCase() + fullPath + params;
-    
-    console.log('Signature generation:');
-    console.log('  Timestamp:', timestamp);
-    console.log('  Method:', method.toUpperCase());
-    console.log('  Full path:', fullPath);
-    console.log('  Params:', params);
-    console.log('  Message:', message);
-    
+
+    console.log('⚙️  Signature generation:');
+    console.log('📨 Message:', message);
     const signature = createHmac('sha256', this.config.secret)
       .update(message)
       .digest('base64');
-    
-    console.log('  Generated signature:', signature);
     return signature;
   }
 
-  private async makeRequest(method: string, path: string, data?: any): Promise<any> {
+  private async makeRequest(
+    method: string,
+    path: string,
+    data?: any
+  ): Promise<any> {
     // LN Markets API expects timestamp in milliseconds since Unix Epoch
     // Must be within 30 seconds of API server time
     const timestamp = Date.now().toString();
     const upperMethod = method.toUpperCase();
-    
+
     let params = '';
     let signaturePath = path;
     let requestPath = path;
     let requestBody: string | undefined;
-    
+
     // Parse path to separate base path from existing query parameters
     const [basePath, existingQuery] = path.split('?');
     signaturePath = basePath; // Use base path for signature
-    
+
     // Handle params based on HTTP method according to LN Markets API spec
     if (upperMethod.match(/^(GET|DELETE)$/)) {
       // For GET/DELETE: use existing query parameters for signature
@@ -198,30 +201,33 @@ export class LNMarketsService {
         requestBody = params;
       }
     }
-    
-    const signature = this.generateSignature(timestamp, upperMethod, signaturePath, params);
-    
+
+    const signature = this.generateSignature(
+      timestamp,
+      upperMethod,
+      signaturePath,
+      params
+    );
+
     const url = `${this.baseUrl}${requestPath}`;
     const headers = {
       'LNM-ACCESS-KEY': this.config.apiKey,
       'LNM-ACCESS-SIGNATURE': signature,
       'LNM-ACCESS-PASSPHRASE': this.config.passphrase,
       'LNM-ACCESS-TIMESTAMP': timestamp,
-      'Content-Type': 'application/json'
+      'Content-Type': 'application/json',
     };
 
     const requestOptions: RequestInit = {
       method: upperMethod,
       headers,
-      ...(requestBody && { body: requestBody })
+      ...(requestBody && { body: requestBody }),
     };
 
-    console.log('Making request to:', url);
-    console.log('Headers:', headers);
-    console.log('Request body:', requestBody);
-    
+    console.log('🚀 Making request to:', url);
+
     const response = await fetch(url, requestOptions);
-    
+
     if (!response.ok) {
       const errorBody = await response.text();
       console.error('API Error Response:', errorBody);
@@ -238,7 +244,6 @@ export class LNMarketsService {
 
   async getBalance(): Promise<{ balance: string }> {
     const userInfo = await this.makeRequest('GET', '/user');
-    console.log('LN Markets userInfo:', userInfo);
     return { balance: userInfo.balance.toString() };
   }
 
@@ -265,36 +270,33 @@ export class LNMarketsService {
     if (!id || id === 'undefined' || id === 'null') {
       throw new Error('Invalid trade ID provided for updating futures trade');
     }
-    
+
     // Build query parameters for valid updates only
     const params = new URLSearchParams();
     params.append('id', String(id));
-    
+
     if (updates.takeprofit !== undefined && updates.takeprofit !== null) {
       params.append('takeprofit', updates.takeprofit.toString());
     }
     if (updates.stoploss !== undefined && updates.stoploss !== null) {
       params.append('stoploss', updates.stoploss.toString());
     }
-    
+
     const url = `/futures?${params.toString()}`;
     return this.makeRequest('PUT', url);
   }
 
   async closeFuturesTrade(id: string): Promise<any> {
     console.log('Closing futures trade with ID:', id);
-    console.log('ID type:', typeof id);
-    console.log('ID value:', JSON.stringify(id));
-    
+
     if (!id || id === 'undefined' || id === 'null') {
       throw new Error('Invalid trade ID provided for closing futures trade');
     }
-    
+
     // Ensure id is a string
     const tradeId = String(id);
     const url = `/futures?id=${encodeURIComponent(tradeId)}`;
     try {
-      console.log('Request URL for closeFuturesTrade:', url);
       const result = await this.makeRequest('DELETE', url);
       console.log('Futures trade close result:', result);
       return result;
@@ -314,11 +316,11 @@ export class LNMarketsService {
 
   async cancelFuturesOrder(id: string): Promise<any> {
     console.log('Cancelling futures order with ID:', id);
-    
+
     if (!id || id === 'undefined' || id === 'null') {
       throw new Error('Invalid order ID provided for cancelling futures order');
     }
-    
+
     try {
       const url = `/futures/cancel?id=${encodeURIComponent(String(id))}`;
       const result = await this.makeRequest('POST', url);
@@ -343,7 +345,7 @@ export class LNMarketsService {
     if (!id || id === 'undefined' || id === 'null') {
       throw new Error('Invalid trade ID provided for closing options trade');
     }
-    
+
     const url = `/options?id=${encodeURIComponent(String(id))}`;
     return this.makeRequest('DELETE', url);
   }
@@ -362,18 +364,26 @@ export class LNMarketsService {
 
   async getPriceHistory(from?: number, to?: number): Promise<any[]> {
     const params = new URLSearchParams();
-    if (from !== undefined && from !== null) params.append('from', from.toString());
+    if (from !== undefined && from !== null)
+      params.append('from', from.toString());
     if (to !== undefined && to !== null) params.append('to', to.toString());
     const query = params.toString();
-    return this.makeRequest('GET', `/futures/history/price${query ? '?' + query : ''}`);
+    return this.makeRequest(
+      'GET',
+      `/futures/history/price${query ? '?' + query : ''}`
+    );
   }
 
   async getIndexHistory(from?: number, to?: number): Promise<any[]> {
     const params = new URLSearchParams();
-    if (from !== undefined && from !== null) params.append('from', from.toString());
+    if (from !== undefined && from !== null)
+      params.append('from', from.toString());
     if (to !== undefined && to !== null) params.append('to', to.toString());
     const query = params.toString();
-    return this.makeRequest('GET', `/futures/history/index${query ? '?' + query : ''}`);
+    return this.makeRequest(
+      'GET',
+      `/futures/history/index${query ? '?' + query : ''}`
+    );
   }
 
   async getCarryFees(): Promise<any[]> {
@@ -423,7 +433,7 @@ export class LNMarketsService {
       return response;
     } catch (error) {
       console.error(
-        'Error generating deposit address via LN Markets API:',
+        '❌ Error generating deposit address via LN Markets API:',
         error
       );
       throw error;
@@ -432,19 +442,21 @@ export class LNMarketsService {
 
   async getDepositHistory(): Promise<any[]> {
     try {
-      console.log('Calling LN Markets userDepositHistory API');
-      const depositHistory = await this.makeRequest('GET', '/user/deposit-history');
-      console.log('LN Markets deposit history response:', depositHistory);
+      console.log('🔄 Calling LN Markets userDepositHistory API');
+      const depositHistory = await this.makeRequest(
+        'GET',
+        '/user/deposit-history'
+      );
       return depositHistory || [];
     } catch (error) {
-      console.error('Error fetching deposit history:', error);
+      console.error('❌ Error fetching deposit history:', error);
       throw error;
     }
   }
 
   async getDepositStatus(depositId: string): Promise<any> {
     try {
-      console.log('Fetching deposit status for ID:', depositId);
+      console.log('🔄 Fetching deposit status for ID:', depositId);
       // Get all deposits and find the specific one
       const deposits = await this.getDepositHistory();
       const deposit = deposits.find(
@@ -452,14 +464,14 @@ export class LNMarketsService {
       );
 
       if (!deposit) {
-        console.log('Deposit not found in history:', depositId);
+        console.log('❌ Deposit not found in history:', depositId);
         return null;
       }
 
-      console.log('Found deposit status:', deposit);
+      console.log('✅ Found deposit status:', deposit);
       return deposit;
     } catch (error) {
-      console.error('Error fetching deposit status:', error);
+      console.error('❌ Error fetching deposit status:', error);
       throw error;
     }
   }
@@ -467,11 +479,13 @@ export class LNMarketsService {
   // Swap operations
   async executeSwap(swapRequest: SwapRequest): Promise<SwapResponse> {
     try {
-      console.log('Executing swap via LN Markets API:', swapRequest);
-      
+      console.log('🔄 Executing swap via LN Markets API:', swapRequest);
+
       // Validate that exactly one amount is specified
-      if ((swapRequest.in_amount && swapRequest.out_amount) || 
-          (!swapRequest.in_amount && !swapRequest.out_amount)) {
+      if (
+        (swapRequest.in_amount && swapRequest.out_amount) ||
+        (!swapRequest.in_amount && !swapRequest.out_amount)
+      ) {
         throw new Error('Must specify exactly one of in_amount or out_amount');
       }
 
@@ -481,8 +495,8 @@ export class LNMarketsService {
       }
 
       const result = await this.makeRequest('POST', '/swap', swapRequest);
-      console.log('Swap execution result:', result);
-      
+      console.log('✅ Swap execution result:', result);
+
       // Transform the response to match our interface
       const response: SwapResponse = {
         inAsset: result.in_asset || swapRequest.in_asset,
@@ -490,19 +504,23 @@ export class LNMarketsService {
         inAmount: result.in_amount || swapRequest.in_amount || 0,
         outAmount: result.out_amount || swapRequest.out_amount || 0,
       };
-      
+
       return response;
     } catch (error) {
-      console.error('Error executing swap:', error);
+      console.error('❌ Error executing swap:', error);
       throw error;
     }
   }
 
-  async getSwapHistory(from?: number, to?: number, limit?: number): Promise<SwapHistoryItem[]> {
+  async getSwapHistory(
+    from?: number,
+    to?: number,
+    limit?: number
+  ): Promise<SwapHistoryItem[]> {
     try {
-      console.log('Fetching swap history from LN Markets API');
+      console.log('🔄 Fetching swap history from LN Markets API');
       const params = new URLSearchParams();
-      
+
       if (from !== undefined && from !== null) {
         params.append('from', from.toString());
       }
@@ -514,11 +532,14 @@ export class LNMarketsService {
       }
 
       const query = params.toString();
-      const swapHistory = await this.makeRequest('GET', `/swap${query ? '?' + query : ''}`);
-      console.log('Swap history response:', swapHistory);
+      const swapHistory = await this.makeRequest(
+        'GET',
+        `/swap${query ? '?' + query : ''}`
+      );
+      console.log('✅ Swap history response:', swapHistory);
       return swapHistory || [];
     } catch (error) {
-      console.error('Error fetching swap history:', error);
+      console.error('❌ Error fetching swap history:', error);
       throw error;
     }
   }
