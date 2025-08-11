@@ -9,6 +9,7 @@ import {
   User,
   LogOut,
   Clock,
+  Receipt,
 } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
 import { useAuth } from '@/hooks/use-auth';
@@ -37,6 +38,7 @@ const navigation = [
     icon: Clock,
     current: false,
   },
+  { name: 'Transactions', href: '/transactions', icon: Receipt, current: false },
   { name: 'History', href: '/history', icon: History, current: false },
   { name: 'Portfolio', href: '/portfolio', icon: Briefcase, current: false },
   { name: 'Settings', href: '/settings', icon: Settings, current: false },

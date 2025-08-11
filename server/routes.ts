@@ -188,14 +188,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       futuresMarket = null;
 
       // Safely extract values with fallbacks
-      const lastPrice = marketTicker.lastPrice || marketTicker.last_price || marketTicker.price || 0;
-      const indexPrice = marketTicker.index || marketTicker.index_price || lastPrice;
-      const carryFeeRate = marketTicker.carryFeeRate || marketTicker.carry_fee_rate || 0;
-      const carryFeeTimestamp = marketTicker.carryFeeTimestamp || marketTicker.carry_fee_timestamp || Date.now();
+      const lastPrice =
+        marketTicker.lastPrice ||
+        marketTicker.last_price ||
+        marketTicker.price ||
+        0;
+      const indexPrice =
+        marketTicker.index || marketTicker.index_price || lastPrice;
+      const carryFeeRate =
+        marketTicker.carryFeeRate || marketTicker.carry_fee_rate || 0;
+      const carryFeeTimestamp =
+        marketTicker.carryFeeTimestamp ||
+        marketTicker.carry_fee_timestamp ||
+        Date.now();
 
       // Validate critical fields
       if (!lastPrice || typeof lastPrice !== 'number') {
-        throw new Error(`Invalid lastPrice in market ticker response: ${JSON.stringify(marketTicker)}`);
+        throw new Error(
+          `Invalid lastPrice in market ticker response: ${JSON.stringify(
+            marketTicker
+          )}`
+        );
       }
 
       // Note: LN Markets response doesn't include volume24h, using placeholder
@@ -206,19 +219,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         symbol: 'BTC/USD',
         lastPrice: lastPrice.toString(),
         markPrice:
-          futuresMarket?.mark_price?.toString() ||
-          lastPrice.toString(), // Fallback to last price
+          futuresMarket?.mark_price?.toString() || lastPrice.toString(), // Fallback to last price
         indexPrice:
-          futuresMarket?.index_price?.toString() ||
-          indexPrice.toString(), // Use index from ticker
+          futuresMarket?.index_price?.toString() || indexPrice.toString(), // Use index from ticker
         high24h: null, // Not available in current response
         low24h: null, // Not available in current response
         volume24h: null, // Not available in current response
         volumeUSD: volumeUSD,
         openInterest: futuresMarket?.open_interest?.toString() || null,
         fundingRate:
-          futuresMarket?.funding_rate?.toString() ||
-          carryFeeRate.toString(),
+          futuresMarket?.funding_rate?.toString() || carryFeeRate.toString(),
         priceChange24h: null, // Not available in current response
         nextFundingTime: futuresMarket?.next_funding_time
           ? new Date(futuresMarket.next_funding_time * 1000)
@@ -789,12 +799,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'Trade not found' });
       }
 
-      logRequest(req, 'Trade found', { 
+      logRequest(req, 'Trade found', {
         tradeId: trade.id,
         lnMarketsId: trade.lnMarketsId,
         type: trade.type,
         status: trade.status,
-        fullTrade: trade 
+        fullTrade: trade,
       });
 
       const user = await storage.getUser(trade.userId);
@@ -1480,6 +1490,230 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Withdrawal endpoints
+  app.post('/api/withdrawals/lightning', async (req, res) => {
+    logRequest(req, 'Processing Lightning withdrawal', {
+      userId: req.body.userId,
+      amount: req.body.amount,
+    });
+    try {
+      const { userId, amount, invoice } = req.body;
+
+      if (!userId || !invoice) {
+        logError(
+          req,
+          'Withdrawal failed - missing parameters',
+          new Error('Missing userId or invoice')
+        );
+        return res
+          .status(400)
+          .json({ message: 'User ID and invoice are required' });
+      }
+
+      const user = await storage.getUser(userId);
+      if (!user || !user.apiKey || !user.apiSecret || !user.apiPassphrase) {
+        logError(
+          req,
+          'Withdrawal failed - user credentials missing',
+          new Error('Missing API credentials')
+        );
+        return res
+          .status(400)
+          .json({ message: 'User API credentials not found' });
+      }
+
+      // Check user balance
+      if (amount && amount > parseFloat(user.balance || '0')) {
+        logError(
+          req,
+          'Withdrawal failed - insufficient balance',
+          new Error('Insufficient balance')
+        );
+        return res.status(400).json({ message: 'Insufficient balance' });
+      }
+
+      const lnMarketsService = createLNMarketsService({
+        apiKey: user.apiKey,
+        secret: user.apiSecret,
+        passphrase: user.apiPassphrase,
+        network: 'mainnet',
+      });
+
+      // Process withdrawal via LN Markets
+      const withdrawalResult = await lnMarketsService.withdraw(invoice, amount);
+
+      // Store withdrawal in database
+      const withdrawal = await storage.createWithdrawal({
+        userId,
+        lnMarketsId: withdrawalResult.id,
+        type: 'lightning',
+        invoice,
+        paymentHash: withdrawalResult.paymentHash,
+        amount: withdrawalResult.amount,
+        fee: withdrawalResult.fee,
+        status: 'completed',
+      });
+
+      // Update user balance
+      await syncUserBalance(userId);
+
+      logSuccess(req, 'Lightning withdrawal successful', {
+        withdrawalId: withdrawal.id,
+        amount: withdrawalResult.amount,
+      });
+
+      res.json(withdrawal);
+    } catch (error) {
+      logError(req, 'Lightning withdrawal failed', error);
+      res.status(500).json({
+        message: 'Failed to process withdrawal',
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  });
+
+  app.post('/api/withdrawals/usd', async (req, res) => {
+    logRequest(req, '🔄 Processing USD withdrawal', {
+      userId: req.body.userId,
+      amountUSD: req.body.amountUSD,
+    });
+    try {
+      const { userId, amountUSD, invoice } = req.body;
+
+      if (!userId || !amountUSD || !invoice) {
+        logError(
+          req,
+          'USD withdrawal failed - missing parameters',
+          new Error('Missing required parameters')
+        );
+        return res.status(400).json({
+          message: 'User ID, USD amount, and invoice are required',
+        });
+      }
+
+      const user = await storage.getUser(userId);
+      if (!user || !user.apiKey || !user.apiSecret || !user.apiPassphrase) {
+        logError(
+          req,
+          'USD withdrawal failed - user credentials missing',
+          new Error('Missing API credentials')
+        );
+        return res
+          .status(400)
+          .json({ message: 'User API credentials not found' });
+      }
+
+      const lnMarketsService = createLNMarketsService({
+        apiKey: user.apiKey,
+        secret: user.apiSecret,
+        passphrase: user.apiPassphrase,
+        network: 'mainnet',
+      });
+
+      // Process USD withdrawal (swap + withdrawal)
+      const withdrawalResult = await lnMarketsService.withdrawUSD(
+        amountUSD,
+        invoice
+      );
+
+      // Store withdrawal in database
+      const withdrawal = await storage.createWithdrawal({
+        userId,
+        lnMarketsId: withdrawalResult.id,
+        type: 'usd',
+        invoice,
+        paymentHash: withdrawalResult.paymentHash,
+        amount: withdrawalResult.btcAmount,
+        amountUsd: withdrawalResult.usdAmount,
+        fee: withdrawalResult.fee,
+        swapFee: withdrawalResult.swapFee,
+        exchangeRate: withdrawalResult.exchangeRate.toString(),
+        status: 'completed',
+      });
+
+      // Update user balance
+      await syncUserBalance(userId);
+
+      logSuccess(req, 'USD withdrawal successful', {
+        withdrawalId: withdrawal.id,
+        amountUSD: withdrawalResult.usdAmount,
+        amountBTC: withdrawalResult.btcAmount,
+      });
+
+      res.json(withdrawal);
+    } catch (error) {
+      logError(req, '❌ USD withdrawal failed', error);
+      res.status(500).json({
+        message: 'Failed to process USD withdrawal',
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  });
+
+  app.get('/api/withdrawals/:userId', async (req, res) => {
+    logRequest(req, 'Fetching withdrawal history', {
+      userId: req.params.userId,
+    });
+    try {
+      const userId = parseInt(req.params.userId);
+      const withdrawals = await storage.getWithdrawalsByUserId(userId);
+
+      logSuccess(req, 'Withdrawal history fetched', {
+        count: withdrawals.length,
+      });
+
+      res.json(withdrawals);
+    } catch (error) {
+      logError(req, 'Failed to fetch withdrawal history', error);
+      res.status(500).json({ message: 'Failed to fetch withdrawals' });
+    }
+  });
+
+  app.post('/api/withdrawals/estimate', async (req, res) => {
+    logRequest(req, 'Estimating withdrawal fee', {
+      amount: req.body.amount,
+      currency: req.body.currency,
+    });
+    try {
+      const { userId, amount, currency } = req.body;
+
+      if (!userId || !amount) {
+        return res
+          .status(400)
+          .json({ message: 'User ID and amount are required' });
+      }
+
+      const user = await storage.getUser(userId);
+      if (!user || !user.apiKey || !user.apiSecret || !user.apiPassphrase) {
+        return res
+          .status(400)
+          .json({ message: 'User API credentials not found' });
+      }
+
+      const lnMarketsService = createLNMarketsService({
+        apiKey: user.apiKey,
+        secret: user.apiSecret,
+        passphrase: user.apiPassphrase,
+        network: 'mainnet',
+      });
+
+      const estimate = await lnMarketsService.estimateWithdrawalFee(
+        amount,
+        currency || 'BTC'
+      );
+
+      logSuccess(req, 'Withdrawal fee estimated', estimate);
+
+      res.json(estimate);
+    } catch (error) {
+      logError(req, 'Failed to estimate withdrawal fee', error);
+      res.status(500).json({
+        message: 'Failed to estimate withdrawal fee',
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  });
+
   // Scheduled trade routes
   app.get('/api/scheduled-trades/:userId', async (req, res) => {
     try {
@@ -1665,29 +1899,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { userId, fromAsset, toAsset, amount, specifyInput } = req.body;
 
       if (!userId || !fromAsset || !toAsset || !amount) {
-        return res.status(400).json({ 
-          message: 'userId, fromAsset, toAsset, and amount are required' 
+        return res.status(400).json({
+          message: 'userId, fromAsset, toAsset, and amount are required',
         });
       }
 
       // Validate asset types
-      if (!['BTC', 'USD'].includes(fromAsset) || !['BTC', 'USD'].includes(toAsset)) {
-        return res.status(400).json({ 
-          message: 'Only BTC and USD assets are supported' 
+      if (
+        !['BTC', 'USD'].includes(fromAsset) ||
+        !['BTC', 'USD'].includes(toAsset)
+      ) {
+        return res.status(400).json({
+          message: 'Only BTC and USD assets are supported',
         });
       }
 
       if (fromAsset === toAsset) {
-        return res.status(400).json({ 
-          message: 'Cannot swap between the same asset' 
+        return res.status(400).json({
+          message: 'Cannot swap between the same asset',
         });
       }
 
       // Get user's API credentials
       const user = await storage.getUser(userId);
       if (!user || !user.apiKey || !user.apiSecret || !user.apiPassphrase) {
-        return res.status(400).json({ 
-          message: 'User API credentials not configured' 
+        return res.status(400).json({
+          message: 'User API credentials not configured',
         });
       }
 
@@ -1747,19 +1984,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Sync user balance after swap
       await syncUserBalance(userId);
 
-      logSuccess(req, 'Swap executed successfully', { 
-        swapId: swap.id, 
+      logSuccess(req, 'Swap executed successfully', {
+        swapId: swap.id,
         fromAmount: inAmount,
         toAmount: outAmount,
-        rate: exchangeRate 
+        rate: exchangeRate,
       });
 
       res.json(swap);
     } catch (error) {
       logError(req, 'Swap execution failed', error);
-      res.status(500).json({ 
+      res.status(500).json({
         message: 'Failed to execute swap',
-        detail: error instanceof Error ? error.message : 'Unknown error'
+        detail: error instanceof Error ? error.message : 'Unknown error',
       });
     }
   });
@@ -1770,14 +2007,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { userId } = req.body;
 
       if (!userId) {
-        logError(req, 'Swap sync failed - no user ID', new Error('Missing userId'));
+        logError(
+          req,
+          'Swap sync failed - no user ID',
+          new Error('Missing userId')
+        );
         return res.status(400).json({ message: 'User ID is required' });
       }
 
       const user = await storage.getUser(userId);
       if (!user || !user.apiKey || !user.apiSecret || !user.apiPassphrase) {
-        logError(req, 'Swap sync failed - user credentials missing', new Error('Missing API credentials'));
-        return res.status(400).json({ message: 'User API credentials not found' });
+        logError(
+          req,
+          'Swap sync failed - user credentials missing',
+          new Error('Missing API credentials')
+        );
+        return res
+          .status(400)
+          .json({ message: 'User API credentials not found' });
       }
 
       const lnMarketsService = createLNMarketsService({
@@ -1793,12 +2040,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let syncedCount = 0;
       let updatedCount = 0;
 
-      logRequest(req, 'Processing swap history', { swapsFound: swapHistory.length });
+      logRequest(req, 'Processing swap history', {
+        swapsFound: swapHistory.length,
+      });
 
       for (const lnSwap of swapHistory) {
         // Check if swap already exists in our database
         const existingSwaps = await storage.getSwapsByUserId(userId);
-        const existingSwap = existingSwaps.find(s => s.lnMarketsId === lnSwap.id);
+        const existingSwap = existingSwaps.find(
+          (s) => s.lnMarketsId === lnSwap.id
+        );
 
         if (existingSwap) {
           // Update existing swap - swaps are typically final, so minimal updates needed
@@ -1845,11 +2096,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Scheduled swap endpoints
   app.get('/api/scheduled-swaps/:userId', async (req, res) => {
-    logRequest(req, 'Fetching user scheduled swaps', { userId: req.params.userId });
+    logRequest(req, 'Fetching user scheduled swaps', {
+      userId: req.params.userId,
+    });
     try {
       const userId = parseInt(req.params.userId);
       const scheduledSwaps = await storage.getScheduledSwapsByUserId(userId);
-      logSuccess(req, 'User scheduled swaps retrieved', { count: scheduledSwaps.length });
+      logSuccess(req, 'User scheduled swaps retrieved', {
+        count: scheduledSwaps.length,
+      });
       res.json(scheduledSwaps);
     } catch (error) {
       logError(req, 'Failed to fetch user scheduled swaps', error);
@@ -1860,26 +2115,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/scheduled-swaps', async (req, res) => {
     logRequest(req, 'Creating scheduled swap', req.body);
     try {
-      const { userId, scheduleType, swapDirection, amount, triggerConfig, name, description } = req.body;
+      const {
+        userId,
+        scheduleType,
+        swapDirection,
+        amount,
+        triggerConfig,
+        name,
+        description,
+      } = req.body;
 
       // Validate required fields
-      if (!userId || !scheduleType || !swapDirection || !amount || !triggerConfig) {
+      if (
+        !userId ||
+        !scheduleType ||
+        !swapDirection ||
+        !amount ||
+        !triggerConfig
+      ) {
         return res.status(400).json({
-          message: 'userId, scheduleType, swapDirection, amount, and triggerConfig are required'
+          message:
+            'userId, scheduleType, swapDirection, amount, and triggerConfig are required',
         });
       }
 
       // Validate schedule type
-      if (!['calendar', 'recurring', 'market_condition'].includes(scheduleType)) {
+      if (
+        !['calendar', 'recurring', 'market_condition'].includes(scheduleType)
+      ) {
         return res.status(400).json({
-          message: 'Invalid schedule type. Must be calendar, recurring, or market_condition'
+          message:
+            'Invalid schedule type. Must be calendar, recurring, or market_condition',
         });
       }
 
       // Validate swap direction
       if (!['btc_to_usd', 'usd_to_btc'].includes(swapDirection)) {
         return res.status(400).json({
-          message: 'Invalid swap direction. Must be btc_to_usd or usd_to_btc'
+          message: 'Invalid swap direction. Must be btc_to_usd or usd_to_btc',
         });
       }
 
@@ -1894,7 +2167,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             parsedTriggerConfig = recurringTriggerSchema.parse(triggerConfig);
             break;
           case 'market_condition':
-            parsedTriggerConfig = marketConditionTriggerSchema.parse(triggerConfig);
+            parsedTriggerConfig =
+              marketConditionTriggerSchema.parse(triggerConfig);
             break;
           default:
             throw new Error('Invalid schedule type');
@@ -1902,7 +2176,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } catch (validationError) {
         return res.status(400).json({
           message: 'Invalid trigger configuration',
-          error: validationError instanceof Error ? validationError.message : 'Unknown error'
+          error:
+            validationError instanceof Error
+              ? validationError.message
+              : 'Unknown error',
         });
       }
 
@@ -1924,31 +2201,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status: 'active',
       });
 
-      logSuccess(req, 'Scheduled swap created successfully', { 
+      logSuccess(req, 'Scheduled swap created successfully', {
         scheduledSwapId: scheduledSwap.id,
         scheduleType,
         swapDirection,
-        amount 
+        amount,
       });
 
       res.json(scheduledSwap);
     } catch (error) {
       logError(req, 'Failed to create scheduled swap', error);
-      res.status(500).json({ 
+      res.status(500).json({
         message: 'Failed to create scheduled swap',
-        detail: error instanceof Error ? error.message : 'Unknown error'
+        detail: error instanceof Error ? error.message : 'Unknown error',
       });
     }
   });
 
   app.put('/api/scheduled-swaps/:id', async (req, res) => {
-    logRequest(req, 'Updating scheduled swap', { id: req.params.id, updates: req.body });
+    logRequest(req, 'Updating scheduled swap', {
+      id: req.params.id,
+      updates: req.body,
+    });
     try {
       const scheduledSwapId = parseInt(req.params.id);
       const { name, description, status, triggerConfig } = req.body;
 
       // Get existing scheduled swap
-      const existingScheduledSwap = await storage.getScheduledSwap(scheduledSwapId);
+      const existingScheduledSwap = await storage.getScheduledSwap(
+        scheduledSwapId
+      );
       if (!existingScheduledSwap) {
         return res.status(404).json({ message: 'Scheduled swap not found' });
       }
@@ -1956,7 +2238,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Only allow updates if the scheduled swap is active or paused
       if (!['active', 'paused'].includes(existingScheduledSwap.status)) {
         return res.status(400).json({
-          message: 'Cannot update scheduled swap that is completed or cancelled'
+          message:
+            'Cannot update scheduled swap that is completed or cancelled',
         });
       }
 
@@ -1972,7 +2255,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
               parsedTriggerConfig = recurringTriggerSchema.parse(triggerConfig);
               break;
             case 'market_condition':
-              parsedTriggerConfig = marketConditionTriggerSchema.parse(triggerConfig);
+              parsedTriggerConfig =
+                marketConditionTriggerSchema.parse(triggerConfig);
               break;
             default:
               throw new Error('Invalid schedule type');
@@ -1980,26 +2264,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
         } catch (validationError) {
           return res.status(400).json({
             message: 'Invalid trigger configuration',
-            error: validationError instanceof Error ? validationError.message : 'Unknown error'
+            error:
+              validationError instanceof Error
+                ? validationError.message
+                : 'Unknown error',
           });
         }
       }
 
       // Update scheduled swap
-      const updatedScheduledSwap = await storage.updateScheduledSwap(scheduledSwapId, {
-        name: name !== undefined ? name : existingScheduledSwap.name,
-        description: description !== undefined ? description : existingScheduledSwap.description,
-        status: status !== undefined ? status : existingScheduledSwap.status,
-        triggerConfig: parsedTriggerConfig ? JSON.stringify(parsedTriggerConfig) : existingScheduledSwap.triggerConfig,
-      });
+      const updatedScheduledSwap = await storage.updateScheduledSwap(
+        scheduledSwapId,
+        {
+          name: name !== undefined ? name : existingScheduledSwap.name,
+          description:
+            description !== undefined
+              ? description
+              : existingScheduledSwap.description,
+          status: status !== undefined ? status : existingScheduledSwap.status,
+          triggerConfig: parsedTriggerConfig
+            ? JSON.stringify(parsedTriggerConfig)
+            : existingScheduledSwap.triggerConfig,
+        }
+      );
 
-      logSuccess(req, 'Scheduled swap updated successfully', { scheduledSwapId });
+      logSuccess(req, 'Scheduled swap updated successfully', {
+        scheduledSwapId,
+      });
       res.json(updatedScheduledSwap);
     } catch (error) {
       logError(req, 'Failed to update scheduled swap', error);
-      res.status(500).json({ 
+      res.status(500).json({
         message: 'Failed to update scheduled swap',
-        detail: error instanceof Error ? error.message : 'Unknown error'
+        detail: error instanceof Error ? error.message : 'Unknown error',
       });
     }
   });
@@ -2010,7 +2307,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const scheduledSwapId = parseInt(req.params.id);
 
       // Get existing scheduled swap
-      const existingScheduledSwap = await storage.getScheduledSwap(scheduledSwapId);
+      const existingScheduledSwap = await storage.getScheduledSwap(
+        scheduledSwapId
+      );
       if (!existingScheduledSwap) {
         return res.status(404).json({ message: 'Scheduled swap not found' });
       }
@@ -2018,30 +2317,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Only allow deletion if the scheduled swap is active or paused
       if (!['active', 'paused'].includes(existingScheduledSwap.status)) {
         return res.status(400).json({
-          message: 'Cannot delete scheduled swap that is completed or cancelled'
+          message:
+            'Cannot delete scheduled swap that is completed or cancelled',
         });
       }
 
       // Mark as cancelled instead of deleting
-      await storage.updateScheduledSwap(scheduledSwapId, { status: 'cancelled' });
+      await storage.updateScheduledSwap(scheduledSwapId, {
+        status: 'cancelled',
+      });
 
-      logSuccess(req, 'Scheduled swap cancelled successfully', { scheduledSwapId });
+      logSuccess(req, 'Scheduled swap cancelled successfully', {
+        scheduledSwapId,
+      });
       res.json({ message: 'Scheduled swap cancelled successfully' });
     } catch (error) {
       logError(req, 'Failed to cancel scheduled swap', error);
-      res.status(500).json({ 
+      res.status(500).json({
         message: 'Failed to cancel scheduled swap',
-        detail: error instanceof Error ? error.message : 'Unknown error'
+        detail: error instanceof Error ? error.message : 'Unknown error',
       });
     }
   });
 
   app.get('/api/scheduled-swaps/:id/executions', async (req, res) => {
-    logRequest(req, 'Fetching scheduled swap executions', { id: req.params.id });
+    logRequest(req, 'Fetching scheduled swap executions', {
+      id: req.params.id,
+    });
     try {
       const scheduledSwapId = parseInt(req.params.id);
-      const executions = await storage.getSwapExecutionsByScheduledSwapId(scheduledSwapId);
-      logSuccess(req, 'Scheduled swap executions retrieved', { count: executions.length });
+      const executions = await storage.getSwapExecutionsByScheduledSwapId(
+        scheduledSwapId
+      );
+      logSuccess(req, 'Scheduled swap executions retrieved', {
+        count: executions.length,
+      });
       res.json(executions);
     } catch (error) {
       logError(req, 'Failed to fetch scheduled swap executions', error);
@@ -2063,7 +2373,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Check if scheduled swap is active
       if (scheduledSwap.status !== 'active') {
         return res.status(400).json({
-          message: 'Cannot execute scheduled swap that is not active'
+          message: 'Cannot execute scheduled swap that is not active',
         });
       }
 
@@ -2071,7 +2381,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = await storage.getUser(scheduledSwap.userId);
       if (!user || !user.apiKey || !user.apiSecret || !user.apiPassphrase) {
         return res.status(400).json({
-          message: 'User API credentials not configured'
+          message: 'User API credentials not configured',
         });
       }
 
@@ -2085,9 +2395,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       try {
         // Determine swap parameters
-        const [fromAsset, toAsset] = scheduledSwap.swapDirection === 'btc_to_usd' 
-          ? ['BTC', 'USD'] 
-          : ['USD', 'BTC'];
+        const [fromAsset, toAsset] =
+          scheduledSwap.swapDirection === 'btc_to_usd'
+            ? ['BTC', 'USD']
+            : ['USD', 'BTC'];
 
         // Execute swap via LN Markets
         const swapRequest = {
@@ -2128,13 +2439,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         logSuccess(req, 'Scheduled swap executed successfully', {
           scheduledSwapId: scheduledSwap.id,
           swapId: swap.id,
-          executionId: swapExecution.id
+          executionId: swapExecution.id,
         });
 
         res.json({
           message: 'Scheduled swap executed successfully',
           swap,
-          execution: swapExecution
+          execution: swapExecution,
         });
       } catch (swapError) {
         // Create failed execution record
@@ -2143,21 +2454,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
           swapId: null,
           executionTime: new Date(),
           status: 'failed',
-          failureReason: swapError instanceof Error ? swapError.message : 'Unknown error',
+          failureReason:
+            swapError instanceof Error ? swapError.message : 'Unknown error',
         });
 
         logError(req, 'Scheduled swap execution failed', swapError);
         res.status(500).json({
           message: 'Scheduled swap execution failed',
           execution: swapExecution,
-          error: swapError instanceof Error ? swapError.message : 'Unknown error'
+          error:
+            swapError instanceof Error ? swapError.message : 'Unknown error',
         });
       }
     } catch (error) {
       logError(req, 'Failed to execute scheduled swap', error);
       res.status(500).json({
         message: 'Failed to execute scheduled swap',
-        detail: error instanceof Error ? error.message : 'Unknown error'
+        detail: error instanceof Error ? error.message : 'Unknown error',
       });
     }
   });

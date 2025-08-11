@@ -21,6 +21,7 @@ import { useLocation } from 'wouter';
 import UserPage from './user';
 import FuturesPage from './futures';
 import PortfolioPage from './portfolio';
+import TransactionsPage from './transactions';
 import {
   SidebarProvider,
   SidebarInset,
@@ -94,6 +95,8 @@ export default function Dashboard() {
         return 'Settings';
       case '/schedule-swaps':
         return 'Schedule Swaps';
+      case '/transactions':
+        return 'Transactions';
       default:
         return 'Trading Dashboard';
     }
@@ -115,6 +118,8 @@ export default function Dashboard() {
         return <SettingsContent />;
       case '/schedule-swaps':
         return <ScheduleSwapsPage />;
+      case '/transactions':
+        return <TransactionsPage />;
       default:
         return <DashboardContent />;
     }

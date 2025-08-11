@@ -109,6 +109,25 @@ export const deposits = pgTable('deposits', {
   updatedAt: timestamp('updated_at').defaultNow(),
 });
 
+export const withdrawals = pgTable('withdrawals', {
+  id: serial('id').primaryKey(),
+  userId: integer('user_id').notNull(),
+  lnMarketsId: text('ln_markets_id'), // LN Markets withdrawal ID
+  type: text('type').notNull().default('lightning'), // 'lightning' | 'usd'
+  invoice: text('invoice').notNull(), // Lightning invoice
+  paymentHash: text('payment_hash'), // Payment hash from LN
+  amount: integer('amount').notNull(), // amount in satoshis
+  amountUsd: integer('amount_usd'), // amount in USD cents (for USD withdrawals)
+  fee: integer('fee').default(0), // transaction fee in satoshis
+  swapFee: integer('swap_fee').default(0), // swap fee for USD withdrawals
+  exchangeRate: decimal('exchange_rate', { precision: 18, scale: 8 }), // BTC/USD rate used
+  status: text('status').notNull().default('pending'), // 'pending' | 'completed' | 'failed'
+  errorMessage: text('error_message'), // error message if failed
+  completedAt: timestamp('completed_at'), // when withdrawal was completed
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
 export const scheduledTrades = pgTable('scheduled_trades', {
   id: serial('id').primaryKey(),
   userId: integer('user_id').notNull(),
@@ -236,6 +255,13 @@ export const insertDepositSchema = createInsertSchema(deposits).omit({
   updatedAt: true,
 });
 
+export const insertWithdrawalSchema = createInsertSchema(withdrawals).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  completedAt: true,
+});
+
 export const insertScheduledTradeSchema = createInsertSchema(scheduledTrades)
   .omit({
     id: true,
@@ -291,6 +317,8 @@ export type InsertMarketData = z.infer<typeof insertMarketDataSchema>;
 export type MarketData = typeof marketData.$inferSelect;
 export type InsertDeposit = z.infer<typeof insertDepositSchema>;
 export type Deposit = typeof deposits.$inferSelect;
+export type InsertWithdrawal = z.infer<typeof insertWithdrawalSchema>;
+export type Withdrawal = typeof withdrawals.$inferSelect;
 
 export type InsertScheduledTrade = z.infer<typeof insertScheduledTradeSchema>;
 export type ScheduledTrade = typeof scheduledTrades.$inferSelect;

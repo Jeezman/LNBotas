@@ -70,6 +70,11 @@ function Router() {
           <Dashboard />
         </ProtectedRoute>
       </Route>
+      <Route path="/transactions">
+        <ProtectedRoute>
+          <Dashboard />
+        </ProtectedRoute>
+      </Route>
       <Route component={NotFound} />
     </Switch>
   );

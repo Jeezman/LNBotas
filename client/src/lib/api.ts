@@ -166,6 +166,34 @@ export interface SwapSyncResult {
   totalProcessed: number;
 }
 
+export interface Withdrawal {
+  id: number;
+  userId: number;
+  lnMarketsId: string | null;
+  type: 'lightning' | 'usd';
+  invoice: string;
+  paymentHash: string | null;
+  amount: number;
+  amountUsd: number | null;
+  fee: number | null;
+  swapFee: number | null;
+  exchangeRate: string | null;
+  status: 'pending' | 'completed' | 'failed';
+  errorMessage: string | null;
+  completedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface WithdrawalEstimate {
+  amount: number;
+  fee: number;
+  total: number;
+  currency: 'BTC' | 'USD';
+  exchangeRate: number;
+  usdAmount: number;
+}
+
 export const api = {
   // Market data
   getMarketTicker: async (): Promise<MarketData> => {
@@ -296,6 +324,51 @@ export const api = {
 
   syncSwaps: async (userId: number): Promise<SwapSyncResult> => {
     const response = await apiRequest('POST', '/api/swaps/sync', { userId });
+    return response.json();
+  },
+
+  // Withdrawal operations
+  withdrawLightning: async (
+    userId: number,
+    amount: number,
+    invoice: string
+  ): Promise<Withdrawal> => {
+    const response = await apiRequest('POST', '/api/withdrawals/lightning', {
+      userId,
+      amount,
+      invoice,
+    });
+    return response.json();
+  },
+
+  withdrawUSD: async (
+    userId: number,
+    amountUSD: number,
+    invoice: string
+  ): Promise<Withdrawal> => {
+    const response = await apiRequest('POST', '/api/withdrawals/usd', {
+      userId,
+      amountUSD,
+      invoice,
+    });
+    return response.json();
+  },
+
+  getWithdrawals: async (userId: number): Promise<Withdrawal[]> => {
+    const response = await apiRequest('GET', `/api/withdrawals/${userId}`);
+    return response.json();
+  },
+
+  estimateWithdrawalFee: async (
+    userId: number,
+    amount: number,
+    currency: 'BTC' | 'USD' = 'BTC'
+  ): Promise<WithdrawalEstimate> => {
+    const response = await apiRequest('POST', '/api/withdrawals/estimate', {
+      userId,
+      amount,
+      currency,
+    });
     return response.json();
   },
 };

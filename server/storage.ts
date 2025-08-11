@@ -3,6 +3,7 @@ import {
   trades,
   marketData,
   deposits,
+  withdrawals,
   scheduledTrades,
   swaps,
   scheduledSwaps,
@@ -15,6 +16,8 @@ import {
   type InsertMarketData,
   type Deposit,
   type InsertDeposit,
+  type Withdrawal,
+  type InsertWithdrawal,
   type ScheduledTrade,
   type InsertScheduledTrade,
   type Swap,
@@ -73,6 +76,17 @@ export interface IStorage {
   ): Promise<Deposit | undefined>;
   deleteDeposit(id: number): Promise<boolean>;
 
+  // Withdrawal operations
+  getWithdrawal(id: number): Promise<Withdrawal | undefined>;
+  getWithdrawalsByUserId(userId: number): Promise<Withdrawal[]>;
+  getWithdrawalByPaymentHash(paymentHash: string): Promise<Withdrawal | undefined>;
+  createWithdrawal(withdrawal: InsertWithdrawal): Promise<Withdrawal>;
+  updateWithdrawal(
+    id: number,
+    updates: Partial<Withdrawal>
+  ): Promise<Withdrawal | undefined>;
+  deleteWithdrawal(id: number): Promise<boolean>;
+
   // Swap operations
   getSwap(id: number): Promise<Swap | undefined>;
   getSwapsByUserId(userId: number): Promise<Swap[]>;
@@ -111,6 +125,7 @@ export class MemStorage implements IStorage {
   private scheduledTrades: Map<number, ScheduledTrade>;
   private marketData: Map<string, MarketData>;
   private deposits: Map<number, Deposit>;
+  private withdrawals: Map<number, Withdrawal>;
   private swaps: Map<number, Swap>;
   private scheduledSwaps: Map<number, ScheduledSwap>;
   private swapExecutions: Map<number, SwapExecution>;
@@ -119,6 +134,7 @@ export class MemStorage implements IStorage {
   private currentScheduledTradeId: number;
   private currentMarketDataId: number;
   private currentDepositId: number;
+  private currentWithdrawalId: number;
   private currentSwapId: number;
   private currentScheduledSwapId: number;
   private currentSwapExecutionId: number;
@@ -129,6 +145,7 @@ export class MemStorage implements IStorage {
     this.scheduledTrades = new Map();
     this.marketData = new Map();
     this.deposits = new Map();
+    this.withdrawals = new Map();
     this.swaps = new Map();
     this.scheduledSwaps = new Map();
     this.swapExecutions = new Map();
@@ -137,6 +154,7 @@ export class MemStorage implements IStorage {
     this.currentScheduledTradeId = 1;
     this.currentMarketDataId = 1;
     this.currentDepositId = 1;
+    this.currentWithdrawalId = 1;
     this.currentSwapId = 1;
     this.currentScheduledSwapId = 1;
     this.currentSwapExecutionId = 1;
@@ -442,6 +460,62 @@ export class MemStorage implements IStorage {
 
   async deleteDeposit(id: number): Promise<boolean> {
     return this.deposits.delete(id);
+  }
+
+  // Withdrawal operations
+  async getWithdrawal(id: number): Promise<Withdrawal | undefined> {
+    return this.withdrawals.get(id);
+  }
+
+  async getWithdrawalsByUserId(userId: number): Promise<Withdrawal[]> {
+    return Array.from(this.withdrawals.values()).filter(
+      (withdrawal) => withdrawal.userId === userId
+    );
+  }
+
+  async getWithdrawalByPaymentHash(paymentHash: string): Promise<Withdrawal | undefined> {
+    return Array.from(this.withdrawals.values()).find(
+      (withdrawal) => withdrawal.paymentHash === paymentHash
+    );
+  }
+
+  async createWithdrawal(insertWithdrawal: InsertWithdrawal): Promise<Withdrawal> {
+    const id = this.currentWithdrawalId++;
+    const withdrawal: Withdrawal = {
+      id,
+      userId: insertWithdrawal.userId,
+      lnMarketsId: insertWithdrawal.lnMarketsId || null,
+      type: insertWithdrawal.type || 'lightning',
+      invoice: insertWithdrawal.invoice,
+      paymentHash: insertWithdrawal.paymentHash || null,
+      amount: insertWithdrawal.amount,
+      amountUsd: insertWithdrawal.amountUsd || null,
+      fee: insertWithdrawal.fee || 0,
+      swapFee: insertWithdrawal.swapFee || 0,
+      exchangeRate: insertWithdrawal.exchangeRate || null,
+      status: insertWithdrawal.status || 'pending',
+      errorMessage: insertWithdrawal.errorMessage || null,
+      completedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.withdrawals.set(id, withdrawal);
+    return withdrawal;
+  }
+
+  async updateWithdrawal(
+    id: number,
+    updates: Partial<Withdrawal>
+  ): Promise<Withdrawal | undefined> {
+    const withdrawal = this.withdrawals.get(id);
+    if (!withdrawal) return undefined;
+    const updated = { ...withdrawal, ...updates, updatedAt: new Date() };
+    this.withdrawals.set(id, updated);
+    return updated;
+  }
+
+  async deleteWithdrawal(id: number): Promise<boolean> {
+    return this.withdrawals.delete(id);
   }
 
   // Swap operations
@@ -833,6 +907,52 @@ export class DatabaseStorage implements IStorage {
 
   async deleteDeposit(id: number): Promise<boolean> {
     const result = await db.delete(deposits).where(eq(deposits.id, id));
+    return (result.rowCount || 0) > 0;
+  }
+
+  // Withdrawal operations
+  async getWithdrawal(id: number): Promise<Withdrawal | undefined> {
+    const [withdrawal] = await db
+      .select()
+      .from(withdrawals)
+      .where(eq(withdrawals.id, id));
+    return withdrawal || undefined;
+  }
+
+  async getWithdrawalsByUserId(userId: number): Promise<Withdrawal[]> {
+    return db.select().from(withdrawals).where(eq(withdrawals.userId, userId));
+  }
+
+  async getWithdrawalByPaymentHash(paymentHash: string): Promise<Withdrawal | undefined> {
+    const [withdrawal] = await db
+      .select()
+      .from(withdrawals)
+      .where(eq(withdrawals.paymentHash, paymentHash));
+    return withdrawal || undefined;
+  }
+
+  async createWithdrawal(insertWithdrawal: InsertWithdrawal): Promise<Withdrawal> {
+    const [withdrawal] = await db
+      .insert(withdrawals)
+      .values(insertWithdrawal)
+      .returning();
+    return withdrawal;
+  }
+
+  async updateWithdrawal(
+    id: number,
+    updates: Partial<Withdrawal>
+  ): Promise<Withdrawal | undefined> {
+    const [withdrawal] = await db
+      .update(withdrawals)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(withdrawals.id, id))
+      .returning();
+    return withdrawal || undefined;
+  }
+
+  async deleteWithdrawal(id: number): Promise<boolean> {
+    const result = await db.delete(withdrawals).where(eq(withdrawals.id, id));
     return (result.rowCount || 0) > 0;
   }
 
