@@ -104,3 +104,4 @@ UI components follow shadcn/ui patterns with Radix primitives. Custom components
 
 ### Type Safety
 Shared types in `shared/schema.ts` with Zod validation schemas. TypeScript configuration includes strict mode and proper path resolution.
+- When working with database, prioritze migration files to prevent data loss
