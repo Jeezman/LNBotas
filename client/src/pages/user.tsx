@@ -15,6 +15,8 @@ import { useState } from "react";
 import { User, Bitcoin, DollarSign, Copy, QrCode, Download, RefreshCw, Hash, Settings, Zap, Mail, Key, Send } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { DepositModal } from "@/components/deposit-modal";
+import { WithdrawalModal } from "@/components/withdrawal-modal";
+import { useWithdrawals } from "@/hooks/use-withdrawals";
 
 const depositFormSchema = z.object({
   amount: z.string().min(1, "Amount is required").refine(

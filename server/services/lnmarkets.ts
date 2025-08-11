@@ -123,6 +123,42 @@ export interface SwapHistoryItem {
   timestamp: number;
 }
 
+export interface WithdrawalResponse {
+  id: string;
+  paymentHash: string;
+  amount: number;
+  fee: number;
+  status: string;
+  successTime: string;
+}
+
+export interface USDWithdrawalResponse extends WithdrawalResponse {
+  usdAmount: number;
+  btcAmount: number;
+  exchangeRate: number;
+  swapFee: number;
+  totalFee: number;
+}
+
+export interface WithdrawalHistoryItem {
+  id: string;
+  amount: number;
+  fee: number;
+  invoice: string;
+  payment_hash: string;
+  status: string;
+  created_ts: string;
+  success_time?: string;
+}
+
+export interface WithdrawalEstimate {
+  amount: number;
+  fee: number;
+  total: number;
+  currency: 'BTC' | 'USD';
+  usdAmount: number;
+}
+
 export class LNMarketsService {
   private config: LNMarketsConfig;
   private baseUrl: string;
@@ -230,7 +266,7 @@ export class LNMarketsService {
 
     if (!response.ok) {
       const errorBody = await response.text();
-      console.error('API Error Response:', errorBody);
+      console.error('‼️ LNM - API Error Response:', errorBody);
       throw new Error(`HTTP ${response.status}: ${errorBody}`);
     }
 
@@ -541,6 +577,169 @@ export class LNMarketsService {
     } catch (error) {
       console.error('❌ Error fetching swap history:', error);
       throw error;
+    }
+  }
+
+  // Withdrawal operations
+  async withdraw(
+    invoice: string,
+    amount?: number
+  ): Promise<WithdrawalResponse> {
+    try {
+      console.log('🔄 Processing Lightning withdrawal');
+
+      // Validate invoice format (basic check)
+      if (!invoice || !invoice.startsWith('lnbc')) {
+        throw new Error('Invalid Lightning invoice format');
+      }
+
+      const withdrawRequest: any = { invoice };
+
+      // If amount is specified, include it (for withdrawing specific amount)
+      if (amount !== undefined && amount > 0) {
+        withdrawRequest.amount = amount;
+        withdrawRequest.unit = 'sat';
+      }
+
+      const result = await this.makeRequest(
+        'POST',
+        '/user/withdraw',
+        withdrawRequest
+      );
+      console.log('✅ Withdrawal successful:', result);
+
+      return {
+        id: result.id,
+        paymentHash: result.payment_hash || result.paymentHash,
+        amount: result.amount,
+        fee: result.fee,
+        status: 'completed',
+        successTime:
+          result.success_time || result.successTime || new Date().toISOString(),
+      };
+    } catch (error) {
+      console.error('❌ Error processing withdrawal:', error);
+      throw error;
+    }
+  }
+
+  async withdrawUSD(
+    amountInCents: number,
+    invoice: string
+  ): Promise<USDWithdrawalResponse> {
+    try {
+      console.log('🔄 Processing USD withdrawal');
+      console.log(`  Amount: $${(amountInCents / 100).toFixed(2)} USD`);
+
+      // Validate inputs
+      if (amountInCents <= 0) {
+        throw new Error('Invalid withdrawal amount');
+      }
+      if (!invoice || !invoice.startsWith('lnbc')) {
+        throw new Error('Invalid Lightning invoice format');
+      }
+
+      // Withdraw USD directly via Lightning
+      // LN Markets handles USD balance internally
+      const withdrawRequest: any = {
+        invoice,
+      };
+
+      const result = await this.makeRequest(
+        'POST',
+        '/user/withdraw/usd',
+        withdrawRequest
+      );
+
+      console.log('✅ USD Withdrawal successful:', result);
+
+      return {
+        id: result.id,
+        paymentHash: result.payment_hash || result.paymentHash,
+        amount: result.amount_sats || result.amount, // Amount in sats
+        fee: result.fee || 0,
+        status: 'completed',
+        successTime:
+          result.success_time || result.successTime || new Date().toISOString(),
+        usdAmount: amountInCents,
+        btcAmount: result.amount_sats || result.amount,
+        exchangeRate: result.exchange_rate || 0,
+        swapFee: 0,
+        totalFee: result.fee || 0,
+      };
+    } catch (error) {
+      console.error('❌ Error processing USD withdrawal:', error);
+      throw error;
+    }
+  }
+
+  async getWithdrawalHistory(
+    from?: number,
+    to?: number,
+    limit?: number
+  ): Promise<WithdrawalHistoryItem[]> {
+    try {
+      console.log('🔄 Fetching withdrawal history');
+      const params = new URLSearchParams();
+
+      if (from !== undefined && from !== null) {
+        params.append('from', from.toString());
+      }
+      if (to !== undefined && to !== null) {
+        params.append('to', to.toString());
+      }
+      if (limit !== undefined && limit !== null) {
+        params.append('limit', limit.toString());
+      }
+
+      const query = params.toString();
+      const withdrawals = await this.makeRequest(
+        'GET',
+        `/user/withdraw${query ? '?' + query : ''}`
+      );
+
+      console.log(
+        '✅ Withdrawal history fetched:',
+        withdrawals?.length || 0,
+        'items'
+      );
+      return withdrawals || [];
+    } catch (error) {
+      console.error('❌ Error fetching withdrawal history:', error);
+      throw error;
+    }
+  }
+
+  async estimateWithdrawalFee(
+    amount: number,
+    currency: 'BTC' | 'USD' = 'BTC'
+  ): Promise<WithdrawalEstimate> {
+    try {
+      console.log('🔄 Estimating withdrawal fee');
+
+      let btcAmount = amount;
+      let usdAmount = 0;
+
+      // Estimate Lightning Network fee (typically 1-2% or minimum 1 sat)
+      const estimatedFee = Math.max(1, Math.floor(btcAmount * 0.01));
+
+      return {
+        amount: btcAmount,
+        fee: estimatedFee,
+        total: btcAmount + estimatedFee,
+        currency,
+        usdAmount,
+      };
+    } catch (error) {
+      console.error('❌ Error estimating withdrawal fee:', error);
+      // Return a default estimate if API call fails
+      return {
+        amount,
+        fee: Math.max(1, Math.floor(amount * 0.01)),
+        total: amount + Math.max(1, Math.floor(amount * 0.01)),
+        currency,
+        usdAmount: 0,
+      };
     }
   }
 }
