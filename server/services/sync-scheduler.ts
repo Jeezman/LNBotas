@@ -919,15 +919,15 @@ export function stopPeriodicSync() {
 export function startScheduler() {
   console.log('🔄 Starting scheduler...');
 
-  // Check scheduled trades every five minutes
-  setInterval(checkScheduledTrades, 5 * 60 * 1000);
+  // Check scheduled trades every 30 seconds for responsive triggering
+  setInterval(checkScheduledTrades, 30 * 1000);
 
-  // Check scheduled swaps every five minutes
-  setInterval(checkScheduledSwaps, 5 * 60 * 1000);
+  // Check scheduled swaps every 30 seconds for responsive triggering
+  setInterval(checkScheduledSwaps, 30 * 1000);
 
   // Initial checks
   checkScheduledTrades();
   checkScheduledSwaps();
 
-  console.log('🔄 Scheduler started - checking both scheduled trades and swaps every 5 minutes');
+  console.log('🔄 Scheduler started - checking both scheduled trades and swaps every 30 seconds');
 }
