@@ -259,9 +259,28 @@ async function checkScheduledTrades() {
         const shouldTrigger = await checkScheduledTradeTrigger(scheduledTrade);
 
         if (shouldTrigger) {
+          // Check if we've already triggered this recently (within last 5 minutes)
+          // This prevents duplicate executions when trigger conditions remain true
+          const lastChecked = scheduledTrade.lastCheckedAt ? new Date(scheduledTrade.lastCheckedAt) : null;
+          const now = new Date();
+          const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000);
+          
+          if (lastChecked && lastChecked > fiveMinutesAgo) {
+            console.log(
+              `⏸️ Scheduled trade ${scheduledTrade.id} already triggered recently (last check: ${lastChecked.toISOString()}), skipping...`
+            );
+            continue;
+          }
+
           console.log(
             `📺 Scheduled trade ${scheduledTrade.id} should trigger - executing...`
           );
+          
+          // Update lastCheckedAt before execution to prevent duplicate triggers
+          await storage.updateScheduledTrade(scheduledTrade.id, {
+            lastCheckedAt: now,
+          });
+          
           await executeScheduledTrade(scheduledTrade);
         } else {
           console.log(
