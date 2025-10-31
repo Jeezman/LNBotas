@@ -1840,14 +1840,78 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      // Process and validate the updates
+      const processedUpdates: any = {};
+      
+      // Handle basic trade fields
+      if (updates.type !== undefined) processedUpdates.type = updates.type;
+      if (updates.side !== undefined) processedUpdates.side = updates.side;
+      if (updates.orderType !== undefined) processedUpdates.orderType = updates.orderType;
+      if (updates.name !== undefined) processedUpdates.name = updates.name || null;
+      if (updates.description !== undefined) processedUpdates.description = updates.description || null;
+      
+      // Handle numeric fields with proper type conversion
+      if (updates.margin !== undefined) {
+        processedUpdates.margin = typeof updates.margin === 'string' ? parseInt(updates.margin) : updates.margin;
+      }
+      if (updates.leverage !== undefined) {
+        processedUpdates.leverage = typeof updates.leverage === 'number' ? updates.leverage.toString() : updates.leverage;
+      }
+      if (updates.takeProfit !== undefined) {
+        processedUpdates.takeProfit = updates.takeProfit ? 
+          (typeof updates.takeProfit === 'string' ? updates.takeProfit : updates.takeProfit.toString()) : null;
+      }
+      if (updates.stopLoss !== undefined) {
+        processedUpdates.stopLoss = updates.stopLoss ? 
+          (typeof updates.stopLoss === 'string' ? updates.stopLoss : updates.stopLoss.toString()) : null;
+      }
+      if (updates.quantity !== undefined) {
+        processedUpdates.quantity = updates.quantity || null;
+      }
+      if (updates.instrumentName !== undefined) {
+        processedUpdates.instrumentName = updates.instrumentName || null;
+      }
+      if (updates.settlement !== undefined) {
+        processedUpdates.settlement = updates.settlement || null;
+      }
+      
+      // Handle trigger type changes
+      if (updates.triggerType !== undefined) {
+        processedUpdates.triggerType = updates.triggerType;
+      }
+      
+      // Handle trigger-specific fields based on trigger type
+      if (updates.scheduledTime !== undefined) {
+        processedUpdates.scheduledTime = updates.scheduledTime ? new Date(updates.scheduledTime) : null;
+      }
+      if (updates.targetPriceLow !== undefined) {
+        processedUpdates.targetPriceLow = updates.targetPriceLow ? 
+          (typeof updates.targetPriceLow === 'string' ? updates.targetPriceLow : updates.targetPriceLow.toString()) : null;
+      }
+      if (updates.targetPriceHigh !== undefined) {
+        processedUpdates.targetPriceHigh = updates.targetPriceHigh ? 
+          (typeof updates.targetPriceHigh === 'string' ? updates.targetPriceHigh : updates.targetPriceHigh.toString()) : null;
+      }
+      if (updates.basePriceSnapshot !== undefined) {
+        processedUpdates.basePriceSnapshot = updates.basePriceSnapshot ? 
+          (typeof updates.basePriceSnapshot === 'string' ? updates.basePriceSnapshot : updates.basePriceSnapshot.toString()) : null;
+      }
+      if (updates.pricePercentage !== undefined) {
+        processedUpdates.pricePercentage = updates.pricePercentage ? 
+          (typeof updates.pricePercentage === 'string' ? updates.pricePercentage : updates.pricePercentage.toString()) : null;
+      }
+
       const updatedScheduledTrade = await storage.updateScheduledTrade(
         scheduledTradeId,
-        updates
+        processedUpdates
       );
       res.json(updatedScheduledTrade);
     } catch (error) {
       console.error('Error updating scheduled trade:', error);
-      res.status(500).json({ message: 'Failed to update scheduled trade' });
+      res.status(500).json({ 
+        message: 'Failed to update scheduled trade',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
     }
   });
 
