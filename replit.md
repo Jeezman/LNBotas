@@ -8,6 +8,15 @@ This is a modern web application for Bitcoin derivatives trading through the LN 
 
 Preferred communication style: Simple, everyday language.
 
+## Recent Changes (November 2025)
+
+- **LN Markets API v3 Migration** (November 11, 2025):
+  - Updated all API endpoints from v2 to v3 (https://api.lnmarkets.com/v3)
+  - Fixed signature generation to use lowercase HTTP methods (get, post, put, delete) as required by v3
+  - Updated API base URLs: mainnet uses `https://api.lnmarkets.com/v3`, testnet uses `https://api.testnet4.lnmarkets.com/v3`
+  - **Important**: Users need to regenerate their API keys in the LN Markets portal for v3 compatibility
+  - Old v2 API keys will not work with v3 endpoints and will return "Key is not valid" errors
+
 ## Recent Changes (January 2025)
 
 - **Demo Mode Removal**: Completely removed all demo mode functionality and sample data per user request with real LN Markets API credentials

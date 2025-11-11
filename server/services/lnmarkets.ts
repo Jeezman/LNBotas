@@ -177,11 +177,11 @@ export class LNMarketsService {
     path: string,
     params: string = "",
   ): string {
-    // LN Markets signature format: timestamp + method + path + params
+    // LN Markets v3 signature format: timestamp + method (lowercase) + path + params
     // path MUST include /v3 prefix (e.g., /v3/user not /user)
-    // params: URLSearchParams for GET/DELETE, JSON for POST/PUT, empty string if no data
+    // params: query string for GET/DELETE, JSON for POST/PUT, empty string if no data
     const fullPath = `/v3${path}`;
-    const message = timestamp + method.toUpperCase() + fullPath + params;
+    const message = timestamp + method.toLowerCase() + fullPath + params;
 
     console.log("⚙️  Signature generation:");
     console.log("📨 Message:", message);
