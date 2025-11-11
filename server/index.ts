@@ -66,9 +66,9 @@ app.use((req, res, next) => {
   // Start periodic sync
   startPeriodicSync();
 
-  // Serve the app on port 5001 for development
+  // Serve the app on port 5000 for development
   // this serves both the API and the client.
-  const port = process.env.PORT || 5001;
+  const port = process.env.PORT || 5000;
   server.listen(
     {
       port,

@@ -176,12 +176,14 @@ export class LNMarketsService {
     method: string,
     path: string,
     params: string = "",
+    version: "v2" | "v3" = "v3",
   ): string {
-    // LN Markets v3 signature format: timestamp + method (lowercase) + path + params
-    // path MUST include /v3 prefix (e.g., /v3/user not /user)
-    // params: query string for GET/DELETE, JSON for POST/PUT, empty string if no data
-    const fullPath = `/v3${path}`;
-    const message = timestamp + method.toLowerCase() + fullPath + params;
+    // LN Markets signature format varies by version:
+    // v2: timestamp + UPPERCASE_method + /v2/path + params
+    // v3: timestamp + lowercase_method + /v3/path + params
+    const fullPath = `/${version}${path}`;
+    const methodCase = version === "v2" ? method.toUpperCase() : method.toLowerCase();
+    const message = timestamp + methodCase + fullPath + params;
 
     console.log("⚙️  Signature generation:");
     console.log("📨 Message:", message);
@@ -195,6 +197,7 @@ export class LNMarketsService {
     method: string,
     path: string,
     data?: any,
+    version: "v2" | "v3" = "v3",
   ): Promise<any> {
     // LN Markets API expects timestamp in milliseconds since Unix Epoch
     // Must be within 30 seconds of API server time
@@ -243,9 +246,14 @@ export class LNMarketsService {
       upperMethod,
       signaturePath,
       params,
+      version,
     );
 
-    const url = `${this.baseUrl}${requestPath}`;
+    // Construct base URL with correct version
+    const baseUrl = version === "v2" 
+      ? this.baseUrl.replace("/v3", "/v2")
+      : this.baseUrl;
+    const url = `${baseUrl}${requestPath}`;
     const headers = {
       "LNM-ACCESS-KEY": this.config.apiKey,
       "LNM-ACCESS-SIGNATURE": signature,
@@ -273,19 +281,19 @@ export class LNMarketsService {
     return response.json();
   }
 
-  // User operations
+  // User operations (use v2 API)
   async getUserInfo(): Promise<UserInfo> {
-    return this.makeRequest("GET", "/user");
+    return this.makeRequest("GET", "/user", undefined, "v2");
   }
 
   async getBalance(): Promise<{ balance: string }> {
-    const userInfo = await this.makeRequest("GET", "/user");
+    const userInfo = await this.makeRequest("GET", "/user", undefined, "v2");
     return { balance: userInfo.balance.toString() };
   }
 
-  // Futures operations
+  // Futures operations (use v2 API)
   async createFuturesTrade(trade: FuturesTradeRequest): Promise<any> {
-    return this.makeRequest("POST", "/futures", trade);
+    return this.makeRequest("POST", "/futures", trade, "v2");
   }
 
   async getFuturesTrades(
@@ -296,7 +304,7 @@ export class LNMarketsService {
     params.append("from", "1751299710");
     params.append("limit", "100");
     const url = `/futures?${params.toString()}`;
-    return this.makeRequest("GET", url);
+    return this.makeRequest("GET", url, undefined, "v2");
   }
 
   async updateFuturesTrade(
@@ -319,7 +327,7 @@ export class LNMarketsService {
     }
 
     const url = `/futures?${params.toString()}`;
-    return this.makeRequest("PUT", url);
+    return this.makeRequest("PUT", url, undefined, "v2");
   }
 
   async closeFuturesTrade(id: string): Promise<any> {
@@ -333,7 +341,7 @@ export class LNMarketsService {
     const tradeId = String(id);
     const url = `/futures?id=${encodeURIComponent(tradeId)}`;
     try {
-      const result = await this.makeRequest("DELETE", url);
+      const result = await this.makeRequest("DELETE", url, undefined, "v2");
       console.log("Futures trade close result:", result);
       return result;
     } catch (error) {
@@ -343,11 +351,11 @@ export class LNMarketsService {
   }
 
   async closeAllFuturesTrades(): Promise<any> {
-    return this.makeRequest("DELETE", "/futures/all");
+    return this.makeRequest("DELETE", "/futures/all", undefined, "v2");
   }
 
   async cancelAllFuturesOrders(): Promise<any> {
-    return this.makeRequest("DELETE", "/futures/cancel-all");
+    return this.makeRequest("DELETE", "/futures/cancel-all", undefined, "v2");
   }
 
   async cancelFuturesOrder(id: string): Promise<any> {
@@ -359,7 +367,7 @@ export class LNMarketsService {
 
     try {
       const url = `/futures/cancel?id=${encodeURIComponent(String(id))}`;
-      const result = await this.makeRequest("POST", url);
+      const result = await this.makeRequest("POST", url, undefined, "v2");
       console.log("Futures order cancel result:", result);
       return result;
     } catch (error) {
@@ -368,13 +376,13 @@ export class LNMarketsService {
     }
   }
 
-  // Options operations
+  // Options operations (use v2 API)
   async createOptionsTrade(trade: OptionsTradeRequest): Promise<any> {
-    return this.makeRequest("POST", "/options", trade);
+    return this.makeRequest("POST", "/options", trade, "v2");
   }
 
   async getOptionsTrades(): Promise<any[]> {
-    return this.makeRequest("GET", "/options");
+    return this.makeRequest("GET", "/options", undefined, "v2");
   }
 
   async closeOptionsTrade(id: string): Promise<any> {
@@ -383,16 +391,16 @@ export class LNMarketsService {
     }
 
     const url = `/options?id=${encodeURIComponent(String(id))}`;
-    return this.makeRequest("DELETE", url);
+    return this.makeRequest("DELETE", url, undefined, "v2");
   }
 
   async getOptionsInstruments(): Promise<any[]> {
-    return this.makeRequest("GET", "/options/instruments");
+    return this.makeRequest("GET", "/options/instruments", undefined, "v2");
   }
 
-  // Market data operations
+  // Market data operations (only ticker uses v3, default)
   async getFuturesTicker(): Promise<MarketTicker> {
-    return this.makeRequest("GET", "/futures/ticker");
+    return this.makeRequest("GET", "/futures/ticker", undefined, "v3");
   }
 
   // Note: futuresGetMarket() method is not available in the LN Markets API
@@ -407,6 +415,8 @@ export class LNMarketsService {
     return this.makeRequest(
       "GET",
       `/futures/history/price${query ? "?" + query : ""}`,
+      undefined,
+      "v2",
     );
   }
 
@@ -419,6 +429,8 @@ export class LNMarketsService {
     return this.makeRequest(
       "GET",
       `/futures/history/index${query ? "?" + query : ""}`,
+      undefined,
+      "v2",
     );
   }
 
@@ -427,7 +439,7 @@ export class LNMarketsService {
     params.append("from", "1751299710");
     params.append("to", Math.floor(Date.now() / 1000).toString());
     const url = `/futures/carry-fees?${params.toString()}`;
-    return this.makeRequest("GET", url);
+    return this.makeRequest("GET", url, undefined, "v2");
   }
 
   async getVolatility(): Promise<any> {
@@ -446,10 +458,10 @@ export class LNMarketsService {
         request.amount,
       );
 
-      // Call the actual LN Markets userDeposit function
+      // Call the actual LN Markets userDeposit function (use v2 API)
       const depositResponse = await this.makeRequest("POST", "/user/deposit", {
         amount: request.amount || 100000, // Default to 100k satoshis if not specified
-      });
+      }, "v2");
 
       console.log("LN Markets deposit response:", depositResponse);
 
@@ -482,6 +494,8 @@ export class LNMarketsService {
       const depositHistory = await this.makeRequest(
         "GET",
         "/user/deposit-history",
+        undefined,
+        "v2",
       );
       return depositHistory || [];
     } catch (error) {
@@ -530,7 +544,7 @@ export class LNMarketsService {
         throw new Error("Cannot swap between the same asset");
       }
 
-      const result = await this.makeRequest("POST", "/swap", swapRequest);
+      const result = await this.makeRequest("POST", "/swap", swapRequest, "v2");
       console.log("✅ Swap execution result:", result);
 
       // Transform the response to match our interface
@@ -571,6 +585,8 @@ export class LNMarketsService {
       const swapHistory = await this.makeRequest(
         "GET",
         `/swap${query ? "?" + query : ""}`,
+        undefined,
+        "v2",
       );
       console.log("✅ Swap history response:", swapHistory);
       return swapHistory || [];
@@ -605,6 +621,7 @@ export class LNMarketsService {
         "POST",
         "/user/withdraw",
         withdrawRequest,
+        "v2",
       );
       console.log("✅ Withdrawal successful:", result);
 
@@ -649,6 +666,7 @@ export class LNMarketsService {
         "POST",
         "/user/withdraw/usd",
         withdrawRequest,
+        "v2",
       );
 
       console.log("✅ USD Withdrawal successful:", result);
@@ -696,6 +714,8 @@ export class LNMarketsService {
       const withdrawals = await this.makeRequest(
         "GET",
         `/user/withdraw${query ? "?" + query : ""}`,
+        undefined,
+        "v2",
       );
 
       console.log(
