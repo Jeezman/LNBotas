@@ -8,29 +8,6 @@ This is a modern web application for Bitcoin derivatives trading through the LN 
 
 Preferred communication style: Simple, everyday language.
 
-## Recent Changes (November 2025)
-
-- **LN Markets Hybrid v2/v3 API Architecture** (November 11, 2025):
-  - Implemented hybrid API architecture based on LN Markets endpoint requirements:
-    * **v2 endpoints** (all user/account/trading operations):
-      - User operations: getUserInfo, getBalance
-      - Deposits: generateDepositAddress, getDepositHistory
-      - Withdrawals: withdraw, withdrawUSD, getWithdrawalHistory
-      - Futures trading: create, get, update, close trades and orders
-      - Options trading: create, get, close trades and instruments
-      - Swaps: executeSwap, getSwapHistory
-      - Market history: getPriceHistory, getIndexHistory, getCarryFees
-    * **v3 endpoints** (market data only):
-      - Market ticker: getFuturesTicker
-  - Updated signature generation with version-specific method casing:
-    * v2: UPPERCASE HTTP methods (GET, POST, PUT, DELETE) with /v2{path}
-    * v3: lowercase HTTP methods (get, post, put, delete) with /v3{path}
-  - Updated API base URLs: mainnet v2 uses `https://api.lnmarkets.com/v2`, v3 uses `https://api.lnmarkets.com/v3`
-  - **CRITICAL**: Users must regenerate API keys in the LN Markets portal for v2 compatibility
-  - Old v3-only API keys will return "Api key does not exist" errors on v2 endpoints
-  - Fixed server port binding from 5001 to 5000 for proper Replit integration
-  - Verified implementation with successful user balance sync and trade history retrieval
-
 ## Recent Changes (January 2025)
 
 - **Demo Mode Removal**: Completely removed all demo mode functionality and sample data per user request with real LN Markets API credentials

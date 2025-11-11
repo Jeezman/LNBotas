@@ -206,8 +206,8 @@ async function runAllTests() {
     console.log('   - IDs are sent as query parameters, not in request body');
     console.log('   - No undefined parameters are sent to the API');
     console.log('   - Proper error handling for invalid inputs');
-    console.log('   - Timestamp is in milliseconds since Unix Epoch');
-    console.log('   - Full path including /v3 is used in signature');
+    console.log('   - Timestamp is in seconds, not milliseconds');
+    console.log('   - Full path including /v2 is used in signature');
     
   } catch (error) {
     console.error('Test runner error:', error);

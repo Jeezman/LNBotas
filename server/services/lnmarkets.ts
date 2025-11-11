@@ -1,15 +1,15 @@
-import { createHmac } from "crypto";
+import { createHmac } from 'crypto';
 
 export interface LNMarketsConfig {
   apiKey: string;
   secret: string;
   passphrase: string;
-  network?: "mainnet" | "testnet";
+  network?: 'mainnet' | 'testnet';
 }
 
 export interface FuturesTradeRequest {
-  type: "l" | "m"; // limit or market
-  side: "b" | "s"; // buy or sell
+  type: 'l' | 'm'; // limit or market
+  side: 'b' | 's'; // buy or sell
   margin: number; // in satoshis
   leverage: number;
   quantity?: number;
@@ -19,9 +19,9 @@ export interface FuturesTradeRequest {
 }
 
 export interface OptionsTradeRequest {
-  side: "b"; // buy only for options
+  side: 'b'; // buy only for options
   quantity: number;
-  settlement: "physical" | "cash";
+  settlement: 'physical' | 'cash';
   instrument_name: string;
 }
 
@@ -43,8 +43,8 @@ export interface MarketTicker {
 export interface LNMarketsTrade {
   id: string;
   uid: string;
-  type: "m" | "l"; // market or limit
-  side: "b" | "s"; // buy or sell
+  type: 'm' | 'l'; // market or limit
+  side: 'b' | 's'; // buy or sell
   opening_fee: number;
   closing_fee: number;
   maintenance_margin: number;
@@ -100,8 +100,8 @@ export interface DepositResponse {
 }
 
 export interface SwapRequest {
-  in_asset: "BTC" | "USD";
-  out_asset: "BTC" | "USD";
+  in_asset: 'BTC' | 'USD';
+  out_asset: 'BTC' | 'USD';
   in_amount?: number; // Amount in satoshis for BTC, cents for USD
   out_amount?: number; // Amount in satoshis for BTC, cents for USD
 }
@@ -155,7 +155,7 @@ export interface WithdrawalEstimate {
   amount: number;
   fee: number;
   total: number;
-  currency: "BTC" | "USD";
+  currency: 'BTC' | 'USD';
   usdAmount: number;
 }
 
@@ -166,51 +166,48 @@ export class LNMarketsService {
   constructor(config: LNMarketsConfig) {
     this.config = config;
     this.baseUrl =
-      config.network === "testnet"
-        ? "https://api.testnet4.lnmarkets.com/v3"
-        : "https://api.lnmarkets.com/v3";
+      config.network === 'testnet'
+        ? 'https://api.testnet4.lnmarkets.com/v2'
+        : 'https://api.lnmarkets.com/v2';
   }
 
   private generateSignature(
     timestamp: string,
     method: string,
     path: string,
-    params: string = "",
-    version: "v2" | "v3" = "v3",
+    params: string = ''
   ): string {
-    // LN Markets signature format varies by version:
-    // v2: timestamp + UPPERCASE_method + /v2/path + params
-    // v3: timestamp + lowercase_method + /v3/path + params
-    const fullPath = `/${version}${path}`;
-    const methodCase = version === "v2" ? method.toUpperCase() : method.toLowerCase();
-    const message = timestamp + methodCase + fullPath + params;
+    // LN Markets signature format: timestamp + method + path + params
+    // path MUST include /v2 prefix (e.g., /v2/user not /user)
+    // params: URLSearchParams for GET/DELETE, JSON for POST/PUT, empty string if no data
+    const fullPath = `/v2${path}`;
+    const message = timestamp + method.toUpperCase() + fullPath + params;
 
-    console.log("⚙️  Signature generation:");
-    console.log("📨 Message:", message);
-    const signature = createHmac("sha256", this.config.secret)
+    console.log('⚙️  Signature generation:');
+    console.log('📨 Message:', message);
+    const signature = createHmac('sha256', this.config.secret)
       .update(message)
-      .digest("base64");
+      .digest('base64');
     return signature;
   }
 
   private async makeRequest(
     method: string,
     path: string,
-    data?: any,
-    version: "v2" | "v3" = "v3",
+    data?: any
   ): Promise<any> {
     // LN Markets API expects timestamp in milliseconds since Unix Epoch
     // Must be within 30 seconds of API server time
     const timestamp = Date.now().toString();
     const upperMethod = method.toUpperCase();
 
-    let params = "";
+    let params = '';
     let signaturePath = path;
     let requestPath = path;
     let requestBody: string | undefined;
 
     // Parse path to separate base path from existing query parameters
-    const [basePath, existingQuery] = path.split("?");
+    const [basePath, existingQuery] = path.split('?');
     signaturePath = basePath; // Use base path for signature
 
     // Handle params based on HTTP method according to LN Markets API spec
@@ -245,21 +242,16 @@ export class LNMarketsService {
       timestamp,
       upperMethod,
       signaturePath,
-      params,
-      version,
+      params
     );
 
-    // Construct base URL with correct version
-    const baseUrl = version === "v2" 
-      ? this.baseUrl.replace("/v3", "/v2")
-      : this.baseUrl;
-    const url = `${baseUrl}${requestPath}`;
+    const url = `${this.baseUrl}${requestPath}`;
     const headers = {
-      "LNM-ACCESS-KEY": this.config.apiKey,
-      "LNM-ACCESS-SIGNATURE": signature,
-      "LNM-ACCESS-PASSPHRASE": this.config.passphrase,
-      "LNM-ACCESS-TIMESTAMP": timestamp,
-      "Content-Type": "application/json",
+      'LNM-ACCESS-KEY': this.config.apiKey,
+      'LNM-ACCESS-SIGNATURE': signature,
+      'LNM-ACCESS-PASSPHRASE': this.config.passphrase,
+      'LNM-ACCESS-TIMESTAMP': timestamp,
+      'Content-Type': 'application/json',
     };
 
     const requestOptions: RequestInit = {
@@ -268,139 +260,139 @@ export class LNMarketsService {
       ...(requestBody && { body: requestBody }),
     };
 
-    console.log("🚀 Making request to:", url);
+    console.log('🚀 Making request to:', url);
 
     const response = await fetch(url, requestOptions);
 
     if (!response.ok) {
       const errorBody = await response.text();
-      console.error("‼️ LNM - API Error Response:", errorBody);
+      console.error('‼️ LNM - API Error Response:', errorBody);
       throw new Error(`HTTP ${response.status}: ${errorBody}`);
     }
 
     return response.json();
   }
 
-  // User operations (use v2 API)
+  // User operations
   async getUserInfo(): Promise<UserInfo> {
-    return this.makeRequest("GET", "/user", undefined, "v2");
+    return this.makeRequest('GET', '/user');
   }
 
   async getBalance(): Promise<{ balance: string }> {
-    const userInfo = await this.makeRequest("GET", "/user", undefined, "v2");
+    const userInfo = await this.makeRequest('GET', '/user');
     return { balance: userInfo.balance.toString() };
   }
 
-  // Futures operations (use v2 API)
+  // Futures operations
   async createFuturesTrade(trade: FuturesTradeRequest): Promise<any> {
-    return this.makeRequest("POST", "/futures", trade, "v2");
+    return this.makeRequest('POST', '/futures', trade);
   }
 
   async getFuturesTrades(
-    type: "open" | "closed" | "running" = "open",
+    type: 'open' | 'closed' | 'running' = 'open'
   ): Promise<LNMarketsTrade[]> {
     const params = new URLSearchParams();
-    params.append("type", type);
-    params.append("from", "1751299710");
-    params.append("limit", "100");
+    params.append('type', type);
+    params.append('from', '1751299710');
+    params.append('limit', '100');
     const url = `/futures?${params.toString()}`;
-    return this.makeRequest("GET", url, undefined, "v2");
+    return this.makeRequest('GET', url);
   }
 
   async updateFuturesTrade(
     id: string,
-    updates: { takeprofit?: number; stoploss?: number },
+    updates: { takeprofit?: number; stoploss?: number }
   ): Promise<any> {
-    if (!id || id === "undefined" || id === "null") {
-      throw new Error("Invalid trade ID provided for updating futures trade");
+    if (!id || id === 'undefined' || id === 'null') {
+      throw new Error('Invalid trade ID provided for updating futures trade');
     }
 
     // Build query parameters for valid updates only
     const params = new URLSearchParams();
-    params.append("id", String(id));
+    params.append('id', String(id));
 
     if (updates.takeprofit !== undefined && updates.takeprofit !== null) {
-      params.append("takeprofit", updates.takeprofit.toString());
+      params.append('takeprofit', updates.takeprofit.toString());
     }
     if (updates.stoploss !== undefined && updates.stoploss !== null) {
-      params.append("stoploss", updates.stoploss.toString());
+      params.append('stoploss', updates.stoploss.toString());
     }
 
     const url = `/futures?${params.toString()}`;
-    return this.makeRequest("PUT", url, undefined, "v2");
+    return this.makeRequest('PUT', url);
   }
 
   async closeFuturesTrade(id: string): Promise<any> {
-    console.log("Closing futures trade with ID:", id);
+    console.log('Closing futures trade with ID:', id);
 
-    if (!id || id === "undefined" || id === "null") {
-      throw new Error("Invalid trade ID provided for closing futures trade");
+    if (!id || id === 'undefined' || id === 'null') {
+      throw new Error('Invalid trade ID provided for closing futures trade');
     }
 
     // Ensure id is a string
     const tradeId = String(id);
     const url = `/futures?id=${encodeURIComponent(tradeId)}`;
     try {
-      const result = await this.makeRequest("DELETE", url, undefined, "v2");
-      console.log("Futures trade close result:", result);
+      const result = await this.makeRequest('DELETE', url);
+      console.log('Futures trade close result:', result);
       return result;
     } catch (error) {
-      console.error("Error closing futures trade:", error);
+      console.error('Error closing futures trade:', error);
       throw error;
     }
   }
 
   async closeAllFuturesTrades(): Promise<any> {
-    return this.makeRequest("DELETE", "/futures/all", undefined, "v2");
+    return this.makeRequest('DELETE', '/futures/all');
   }
 
   async cancelAllFuturesOrders(): Promise<any> {
-    return this.makeRequest("DELETE", "/futures/cancel-all", undefined, "v2");
+    return this.makeRequest('DELETE', '/futures/cancel-all');
   }
 
   async cancelFuturesOrder(id: string): Promise<any> {
-    console.log("Cancelling futures order with ID:", id);
+    console.log('Cancelling futures order with ID:', id);
 
-    if (!id || id === "undefined" || id === "null") {
-      throw new Error("Invalid order ID provided for cancelling futures order");
+    if (!id || id === 'undefined' || id === 'null') {
+      throw new Error('Invalid order ID provided for cancelling futures order');
     }
 
     try {
       const url = `/futures/cancel?id=${encodeURIComponent(String(id))}`;
-      const result = await this.makeRequest("POST", url, undefined, "v2");
-      console.log("Futures order cancel result:", result);
+      const result = await this.makeRequest('POST', url);
+      console.log('Futures order cancel result:', result);
       return result;
     } catch (error) {
-      console.error("Error cancelling futures order:", error);
+      console.error('Error cancelling futures order:', error);
       throw error;
     }
   }
 
-  // Options operations (use v2 API)
+  // Options operations
   async createOptionsTrade(trade: OptionsTradeRequest): Promise<any> {
-    return this.makeRequest("POST", "/options", trade, "v2");
+    return this.makeRequest('POST', '/options', trade);
   }
 
   async getOptionsTrades(): Promise<any[]> {
-    return this.makeRequest("GET", "/options", undefined, "v2");
+    return this.makeRequest('GET', '/options');
   }
 
   async closeOptionsTrade(id: string): Promise<any> {
-    if (!id || id === "undefined" || id === "null") {
-      throw new Error("Invalid trade ID provided for closing options trade");
+    if (!id || id === 'undefined' || id === 'null') {
+      throw new Error('Invalid trade ID provided for closing options trade');
     }
 
     const url = `/options?id=${encodeURIComponent(String(id))}`;
-    return this.makeRequest("DELETE", url, undefined, "v2");
+    return this.makeRequest('DELETE', url);
   }
 
   async getOptionsInstruments(): Promise<any[]> {
-    return this.makeRequest("GET", "/options/instruments", undefined, "v2");
+    return this.makeRequest('GET', '/options/instruments');
   }
 
-  // Market data operations (only ticker uses v3, default)
+  // Market data operations
   async getFuturesTicker(): Promise<MarketTicker> {
-    return this.makeRequest("GET", "/futures/ticker", undefined, "v3");
+    return this.makeRequest('GET', '/futures/ticker');
   }
 
   // Note: futuresGetMarket() method is not available in the LN Markets API
@@ -409,63 +401,59 @@ export class LNMarketsService {
   async getPriceHistory(from?: number, to?: number): Promise<any[]> {
     const params = new URLSearchParams();
     if (from !== undefined && from !== null)
-      params.append("from", from.toString());
-    if (to !== undefined && to !== null) params.append("to", to.toString());
+      params.append('from', from.toString());
+    if (to !== undefined && to !== null) params.append('to', to.toString());
     const query = params.toString();
     return this.makeRequest(
-      "GET",
-      `/futures/history/price${query ? "?" + query : ""}`,
-      undefined,
-      "v2",
+      'GET',
+      `/futures/history/price${query ? '?' + query : ''}`
     );
   }
 
   async getIndexHistory(from?: number, to?: number): Promise<any[]> {
     const params = new URLSearchParams();
     if (from !== undefined && from !== null)
-      params.append("from", from.toString());
-    if (to !== undefined && to !== null) params.append("to", to.toString());
+      params.append('from', from.toString());
+    if (to !== undefined && to !== null) params.append('to', to.toString());
     const query = params.toString();
     return this.makeRequest(
-      "GET",
-      `/futures/history/index${query ? "?" + query : ""}`,
-      undefined,
-      "v2",
+      'GET',
+      `/futures/history/index${query ? '?' + query : ''}`
     );
   }
 
   async getCarryFees(): Promise<any[]> {
     const params = new URLSearchParams();
-    params.append("from", "1751299710");
-    params.append("to", Math.floor(Date.now() / 1000).toString());
+    params.append('from', '1751299710');
+    params.append('to', Math.floor(Date.now() / 1000).toString());
     const url = `/futures/carry-fees?${params.toString()}`;
-    return this.makeRequest("GET", url, undefined, "v2");
+    return this.makeRequest('GET', url);
   }
 
   async getVolatility(): Promise<any> {
     // This endpoint doesn't exist in the current LN Markets API
-    console.warn("getVolatility endpoint not available in LN Markets API");
+    console.warn('getVolatility endpoint not available in LN Markets API');
     return [];
   }
 
   // Deposit operations
   async generateDepositAddress(
-    request: DepositRequest = {},
+    request: DepositRequest = {}
   ): Promise<DepositResponse> {
     try {
       console.log(
-        "Calling LN Markets userDeposit API with amount:",
-        request.amount,
+        'Calling LN Markets userDeposit API with amount:',
+        request.amount
       );
 
-      // Call the actual LN Markets userDeposit function (use v2 API)
-      const depositResponse = await this.makeRequest("POST", "/user/deposit", {
+      // Call the actual LN Markets userDeposit function
+      const depositResponse = await this.makeRequest('POST', '/user/deposit', {
         amount: request.amount || 100000, // Default to 100k satoshis if not specified
-      }, "v2");
+      });
 
-      console.log("LN Markets deposit response:", depositResponse);
+      console.log('LN Markets deposit response:', depositResponse);
 
-      const crypto = await import("crypto");
+      const crypto = await import('crypto');
 
       // Map the LN Markets response to our expected format
       const response: DepositResponse = {
@@ -481,8 +469,8 @@ export class LNMarketsService {
       return response;
     } catch (error) {
       console.error(
-        "❌ Error generating deposit address via LN Markets API:",
-        error,
+        '❌ Error generating deposit address via LN Markets API:',
+        error
       );
       throw error;
     }
@@ -490,38 +478,36 @@ export class LNMarketsService {
 
   async getDepositHistory(): Promise<any[]> {
     try {
-      console.log("🔄 Calling LN Markets userDepositHistory API");
+      console.log('🔄 Calling LN Markets userDepositHistory API');
       const depositHistory = await this.makeRequest(
-        "GET",
-        "/user/deposit-history",
-        undefined,
-        "v2",
+        'GET',
+        '/user/deposit-history'
       );
       return depositHistory || [];
     } catch (error) {
-      console.error("❌ Error fetching deposit history:", error);
+      console.error('❌ Error fetching deposit history:', error);
       throw error;
     }
   }
 
   async getDepositStatus(depositId: string): Promise<any> {
     try {
-      console.log("🔄 Fetching deposit status for ID:", depositId);
+      console.log('🔄 Fetching deposit status for ID:', depositId);
       // Get all deposits and find the specific one
       const deposits = await this.getDepositHistory();
       const deposit = deposits.find(
-        (d) => d.id === depositId || d.deposit_id === depositId,
+        (d) => d.id === depositId || d.deposit_id === depositId
       );
 
       if (!deposit) {
-        console.log("❌ Deposit not found in history:", depositId);
+        console.log('❌ Deposit not found in history:', depositId);
         return null;
       }
 
-      console.log("✅ Found deposit status:", deposit);
+      console.log('✅ Found deposit status:', deposit);
       return deposit;
     } catch (error) {
-      console.error("❌ Error fetching deposit status:", error);
+      console.error('❌ Error fetching deposit status:', error);
       throw error;
     }
   }
@@ -529,23 +515,23 @@ export class LNMarketsService {
   // Swap operations
   async executeSwap(swapRequest: SwapRequest): Promise<SwapResponse> {
     try {
-      console.log("🔄 Executing swap via LN Markets API:", swapRequest);
+      console.log('🔄 Executing swap via LN Markets API:', swapRequest);
 
       // Validate that exactly one amount is specified
       if (
         (swapRequest.in_amount && swapRequest.out_amount) ||
         (!swapRequest.in_amount && !swapRequest.out_amount)
       ) {
-        throw new Error("Must specify exactly one of in_amount or out_amount");
+        throw new Error('Must specify exactly one of in_amount or out_amount');
       }
 
       // Validate asset pair
       if (swapRequest.in_asset === swapRequest.out_asset) {
-        throw new Error("Cannot swap between the same asset");
+        throw new Error('Cannot swap between the same asset');
       }
 
-      const result = await this.makeRequest("POST", "/swap", swapRequest, "v2");
-      console.log("✅ Swap execution result:", result);
+      const result = await this.makeRequest('POST', '/swap', swapRequest);
+      console.log('✅ Swap execution result:', result);
 
       // Transform the response to match our interface
       const response: SwapResponse = {
@@ -557,7 +543,7 @@ export class LNMarketsService {
 
       return response;
     } catch (error) {
-      console.error("❌ Error executing swap:", error);
+      console.error('❌ Error executing swap:', error);
       throw error;
     }
   }
@@ -565,33 +551,31 @@ export class LNMarketsService {
   async getSwapHistory(
     from?: number,
     to?: number,
-    limit?: number,
+    limit?: number
   ): Promise<SwapHistoryItem[]> {
     try {
-      console.log("🔄 Fetching swap history from LN Markets API");
+      console.log('🔄 Fetching swap history from LN Markets API');
       const params = new URLSearchParams();
 
       if (from !== undefined && from !== null) {
-        params.append("from", from.toString());
+        params.append('from', from.toString());
       }
       if (to !== undefined && to !== null) {
-        params.append("to", to.toString());
+        params.append('to', to.toString());
       }
       if (limit !== undefined && limit !== null) {
-        params.append("limit", limit.toString());
+        params.append('limit', limit.toString());
       }
 
       const query = params.toString();
       const swapHistory = await this.makeRequest(
-        "GET",
-        `/swap${query ? "?" + query : ""}`,
-        undefined,
-        "v2",
+        'GET',
+        `/swap${query ? '?' + query : ''}`
       );
-      console.log("✅ Swap history response:", swapHistory);
+      console.log('✅ Swap history response:', swapHistory);
       return swapHistory || [];
     } catch (error) {
-      console.error("❌ Error fetching swap history:", error);
+      console.error('❌ Error fetching swap history:', error);
       throw error;
     }
   }
@@ -599,14 +583,14 @@ export class LNMarketsService {
   // Withdrawal operations
   async withdraw(
     invoice: string,
-    amount?: number,
+    amount?: number
   ): Promise<WithdrawalResponse> {
     try {
-      console.log("🔄 Processing Lightning withdrawal");
+      console.log('🔄 Processing Lightning withdrawal');
 
       // Validate invoice format (basic check)
-      if (!invoice || !invoice.startsWith("lnbc")) {
-        throw new Error("Invalid Lightning invoice format");
+      if (!invoice || !invoice.startsWith('lnbc')) {
+        throw new Error('Invalid Lightning invoice format');
       }
 
       const withdrawRequest: any = { invoice };
@@ -614,46 +598,45 @@ export class LNMarketsService {
       // If amount is specified, include it (for withdrawing specific amount)
       if (amount !== undefined && amount > 0) {
         withdrawRequest.amount = amount;
-        withdrawRequest.unit = "sat";
+        withdrawRequest.unit = 'sat';
       }
 
       const result = await this.makeRequest(
-        "POST",
-        "/user/withdraw",
-        withdrawRequest,
-        "v2",
+        'POST',
+        '/user/withdraw',
+        withdrawRequest
       );
-      console.log("✅ Withdrawal successful:", result);
+      console.log('✅ Withdrawal successful:', result);
 
       return {
         id: result.id,
         paymentHash: result.payment_hash || result.paymentHash,
         amount: result.amount,
         fee: result.fee,
-        status: "completed",
+        status: 'completed',
         successTime:
           result.success_time || result.successTime || new Date().toISOString(),
       };
     } catch (error) {
-      console.error("❌ Error processing withdrawal:", error);
+      console.error('❌ Error processing withdrawal:', error);
       throw error;
     }
   }
 
   async withdrawUSD(
     amountInCents: number,
-    invoice: string,
+    invoice: string
   ): Promise<USDWithdrawalResponse> {
     try {
-      console.log("🔄 Processing USD withdrawal");
+      console.log('🔄 Processing USD withdrawal');
       console.log(`  Amount: $${(amountInCents / 100).toFixed(2)} USD`);
 
       // Validate inputs
       if (amountInCents <= 0) {
-        throw new Error("Invalid withdrawal amount");
+        throw new Error('Invalid withdrawal amount');
       }
-      if (!invoice || !invoice.startsWith("lnbc")) {
-        throw new Error("Invalid Lightning invoice format");
+      if (!invoice || !invoice.startsWith('lnbc')) {
+        throw new Error('Invalid Lightning invoice format');
       }
 
       // Withdraw USD directly via Lightning
@@ -663,20 +646,19 @@ export class LNMarketsService {
       };
 
       const result = await this.makeRequest(
-        "POST",
-        "/user/withdraw/usd",
-        withdrawRequest,
-        "v2",
+        'POST',
+        '/user/withdraw/usd',
+        withdrawRequest
       );
 
-      console.log("✅ USD Withdrawal successful:", result);
+      console.log('✅ USD Withdrawal successful:', result);
 
       return {
         id: result.id,
         paymentHash: result.payment_hash || result.paymentHash,
         amount: result.amount_sats || result.amount, // Amount in sats
         fee: result.fee || 0,
-        status: "completed",
+        status: 'completed',
         successTime:
           result.success_time || result.successTime || new Date().toISOString(),
         usdAmount: amountInCents,
@@ -686,7 +668,7 @@ export class LNMarketsService {
         totalFee: result.fee || 0,
       };
     } catch (error) {
-      console.error("❌ Error processing USD withdrawal:", error);
+      console.error('❌ Error processing USD withdrawal:', error);
       throw error;
     }
   }
@@ -694,48 +676,46 @@ export class LNMarketsService {
   async getWithdrawalHistory(
     from?: number,
     to?: number,
-    limit?: number,
+    limit?: number
   ): Promise<WithdrawalHistoryItem[]> {
     try {
-      console.log("🔄 Fetching withdrawal history");
+      console.log('🔄 Fetching withdrawal history');
       const params = new URLSearchParams();
 
       if (from !== undefined && from !== null) {
-        params.append("from", from.toString());
+        params.append('from', from.toString());
       }
       if (to !== undefined && to !== null) {
-        params.append("to", to.toString());
+        params.append('to', to.toString());
       }
       if (limit !== undefined && limit !== null) {
-        params.append("limit", limit.toString());
+        params.append('limit', limit.toString());
       }
 
       const query = params.toString();
       const withdrawals = await this.makeRequest(
-        "GET",
-        `/user/withdraw${query ? "?" + query : ""}`,
-        undefined,
-        "v2",
+        'GET',
+        `/user/withdraw${query ? '?' + query : ''}`
       );
 
       console.log(
-        "✅ Withdrawal history fetched:",
+        '✅ Withdrawal history fetched:',
         withdrawals?.length || 0,
-        "items",
+        'items'
       );
       return withdrawals || [];
     } catch (error) {
-      console.error("❌ Error fetching withdrawal history:", error);
+      console.error('❌ Error fetching withdrawal history:', error);
       throw error;
     }
   }
 
   async estimateWithdrawalFee(
     amount: number,
-    currency: "BTC" | "USD" = "BTC",
+    currency: 'BTC' | 'USD' = 'BTC'
   ): Promise<WithdrawalEstimate> {
     try {
-      console.log("🔄 Estimating withdrawal fee");
+      console.log('🔄 Estimating withdrawal fee');
 
       let btcAmount = amount;
       let usdAmount = 0;
@@ -751,7 +731,7 @@ export class LNMarketsService {
         usdAmount,
       };
     } catch (error) {
-      console.error("❌ Error estimating withdrawal fee:", error);
+      console.error('❌ Error estimating withdrawal fee:', error);
       // Return a default estimate if API call fails
       return {
         amount,
@@ -765,7 +745,7 @@ export class LNMarketsService {
 }
 
 export function createLNMarketsService(
-  config: LNMarketsConfig,
+  config: LNMarketsConfig
 ): LNMarketsService {
   return new LNMarketsService(config);
 }
